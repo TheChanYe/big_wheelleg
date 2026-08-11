@@ -185,7 +185,7 @@ void can_test_task(void *pvParameters) {
         vTaskDelete(NULL);
     }
 
-    log_inform("CAN test task started (ID=0x%03X, 100ms, 1Mbps)", CAN_TEST_ID);
+    log_inform("CAN test task started (ID=0x%03X, 100ms, 500Kbps)", CAN_TEST_ID);
 
     while (1)
     {

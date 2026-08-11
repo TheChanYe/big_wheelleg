@@ -122,6 +122,10 @@ int my_can_send_std(uint16_t id, const uint8_t *data, uint8_t len)
     uint8_t             mailbox_num;
 
     /*  Parameter check  */
+    if (id > 0x7FFu)
+    {
+        return E_PARAM;       /* standard ID max 11-bit */
+    }
     if (len > 8)
     {
         return E_PARAM;
@@ -186,9 +190,8 @@ int my_can_receive_std(uint16_t *id, uint8_t *data, uint8_t *len)
         return CAN_RX_EMPTY;
     }
 
-    /*  Read message from FIFO0  */
+    /*  Read message from FIFO0 (release done inside SDK)  */
     can_message_receive(CAN1, CAN_RX_FIFO0, &rx_msg);
-    can_receive_fifo_release(CAN1, CAN_RX_FIFO0);
 
     /*  Accept only Standard ID + Data Frame + DLC ≤ 8  */
     if (rx_msg.id_type != CAN_ID_STANDARD)
