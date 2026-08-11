@@ -130,6 +130,11 @@ virtualFolder:
     - name: AppLayer
       files: []
       folders: []
+    - name: Communication
+      files:
+        - path: ../Communication/can_business.c
+        - path: ../Communication/can_business.h
+      folders: []
 dependenceList: []
 outDir: build
 miscInfo:
@@ -151,6 +156,7 @@ targets:
         - ../HardwareLayer
         - ../DriverLayer
         - ../AlgorithmLayer
+        - ../Communication
         - .cmsis/include
         - RTE/_Target_1
         - ../User/inc

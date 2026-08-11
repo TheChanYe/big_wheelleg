@@ -12,8 +12,9 @@
 #include "main.h"
 
 /*  Task enable switches  */
-#define ENABLE_CAN_TX_TEST        0   /* 周期发送 0x123 (已验证, 暂时关闭) */
-#define ENABLE_CAN_LOOPBACK_TEST  1   /* 回环测试: 收到 0x124 → 回发 0x125  */
+#define ENABLE_CAN_TX_TEST        0   /* 周期发送 0x123 (已验证, 关闭)      */
+#define ENABLE_CAN_LOOPBACK_TEST  0   /* 回环测试 (已验证, 关闭)            */
+#define ENABLE_CAN_BUSINESS       1   /* 业务层: 0x101 cmd → 0x201 ACK    */
 
 /*  CAN1 TX test frame definitions  */
 #define CAN_TEST_ID               0x123u

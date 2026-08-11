@@ -4,6 +4,7 @@
 #include "foc.h"
 #include "my_usart.h"
 #include "my_can.h"
+#include "can_business.h"
 
 #define MODULE_NAME       "main"
 
@@ -32,6 +33,9 @@ void can_test_task(void *pvParameters);           // CAN测试任务
 
 TaskHandle_t CanLoopbackTestTaskHandle = NULL;     // CAN回环测试任务句柄
 void can_loopback_test_task(void *pvParameters);   // CAN回环测试任务
+
+TaskHandle_t CanBusinessTaskHandle = NULL;          // CAN业务任务句柄
+void can_business_task(void *pvParameters);         // CAN业务任务
 
 
 Motor_Data g_motor2 = {0};//电机2全局数据
@@ -242,6 +246,35 @@ void can_loopback_test_task(void *pvParameters) {
     }
 }
 
+/***********************CAN业务任务****************************/
+void can_business_task(void *pvParameters) {
+    uint16_t    id;
+    uint8_t     data[8];
+    uint8_t     len;
+    int         ret;
+
+    /* CAN init once from business task */
+    ret = my_can_init();
+    if (ret != E_OK)
+    {
+        log_error("CAN business: my_can_init failed");
+        vTaskDelete(NULL);
+    }
+
+    log_inform("CAN business task started (RX 0x101 cmd -> 0x201 ACK)");
+
+    while (1)
+    {
+        /* drain FIFO0 completely each poll cycle */
+        while (my_can_receive_std(&id, data, &len) == E_OK)
+        {
+            can_business_process_frame(id, data, len);
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(1));   /* 1ms poll interval */
+    }
+}
+
 /***********************状态监测任务****************************/
 void status_monitoring_task(void *pvParameters) {
 	c_switch led = {0};
@@ -311,9 +344,9 @@ int main(void)
     // 创建CAN测试任务
     if (xTaskCreate((TaskFunction_t )can_test_task,
                     (const char*    )"CAN_Test_Task",
-                    (uint16_t       )CAN_TEST_TASK_STACK_SIZE,
+                    (uint16_t       )CAN_BUSINESS_TASK_STACK_SIZE,
                     (void*          )NULL,
-                    (UBaseType_t    )CAN_TEST_TASK_PRIORITY,
+                    (UBaseType_t    )CAN_BUSINESS_TASK_PRIORITY,
                     (TaskHandle_t*  )&CanTestTaskHandle) != pdPASS) {
         log_inform("Failed to create CAN test task\n");
     }
@@ -323,11 +356,23 @@ int main(void)
     /* 创建CAN 回环测试任务 */
     if (xTaskCreate((TaskFunction_t )can_loopback_test_task,
                     (const char*    )"CAN_Loopback",
-                    (uint16_t       )CAN_TEST_TASK_STACK_SIZE,
+                    (uint16_t       )CAN_BUSINESS_TASK_STACK_SIZE,
                     (void*          )NULL,
-                    (UBaseType_t    )CAN_TEST_TASK_PRIORITY,
+                    (UBaseType_t    )CAN_BUSINESS_TASK_PRIORITY,
                     (TaskHandle_t*  )&CanLoopbackTestTaskHandle) != pdPASS) {
         log_inform("Failed to create CAN loopback test task\n");
+    }
+#endif
+
+#if ENABLE_CAN_BUSINESS
+    /* 创建CAN 业务任务 */
+    if (xTaskCreate((TaskFunction_t )can_business_task,
+                    (const char*    )"CAN_Business",
+                    (uint16_t       )CAN_BUSINESS_TASK_STACK_SIZE,
+                    (void*          )NULL,
+                    (UBaseType_t    )CAN_BUSINESS_TASK_PRIORITY,
+                    (TaskHandle_t*  )&CanBusinessTaskHandle) != pdPASS) {
+        log_inform("Failed to create CAN business task\n");
     }
 #endif
 

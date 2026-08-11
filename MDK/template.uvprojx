@@ -338,7 +338,7 @@
               <MiscControls>--locale=english</MiscControls>
               <Define>AT32F403ARGT7,USE_STDPERIPH_DRIVER,AT_START_F403A_V1,ARM_MATH_CM4,__TARGET_FPU_VFP,__FPU_PRESENT</Define>
               <Undefine></Undefine>
-              <IncludePath>..\libraries\cmsis\cm4\core_support;..\libraries\cmsis\cm4\device_support;..\libraries\drivers\inc;..\user\inc;..\freertos\source\include;..\freertos\source\portable\memmang;..\freertos\source\portable\rvds\ARM_CM4F;..\Libraries\cmsis\dsp\include;..\AppLayer\system;..\Tools;..\HardwareLayer;..\DriverLayer;..\AlgorithmLayer</IncludePath>
+              <IncludePath>..\libraries\cmsis\cm4\core_support;..\libraries\cmsis\cm4\device_support;..\libraries\drivers\inc;..\user\inc;..\freertos\source\include;..\freertos\source\portable\memmang;..\freertos\source\portable\rvds\ARM_CM4F;..\Libraries\cmsis\dsp\include;..\AppLayer\system;..\Tools;..\HardwareLayer;..\DriverLayer;..\AlgorithmLayer;..\Communication</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -831,6 +831,21 @@
         </Group>
         <Group>
           <GroupName>AppLayer</GroupName>
+        </Group>
+        <Group>
+          <GroupName>Communication</GroupName>
+          <Files>
+            <File>
+              <FileName>can_business.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Communication\can_business.c</FilePath>
+            </File>
+            <File>
+              <FileName>can_business.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Communication\can_business.h</FilePath>
+            </File>
+          </Files>
         </Group>
       </Groups>
     </Target>

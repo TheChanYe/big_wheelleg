@@ -8,7 +8,7 @@
 */
 typedef enum __TASK_PRO
 {
-	CAN_TEST_TASK_PRIORITY = 1,				// CAN测试任务优先级（低于电机任务）
+	CAN_BUSINESS_TASK_PRIORITY = 1,			// CAN业务任务优先级（低于电机任务）
 	DISPALY_TASK_PRIORITY,					// 定义显示屏任务优先级
 	USART_SEND_TASK_PRIORITY,				// 定义串口发送任务优先级
 	UART_TASK_PRIORITY,						// 串口任务优先级
@@ -44,7 +44,7 @@ typedef enum __INTERRUPT_PRO
 } interrupt_pro;
 
 /*任务堆栈大小*/
-#define CAN_TEST_TASK_STACK_SIZE             256     // CAN测试任务堆栈大小
+#define CAN_BUSINESS_TASK_STACK_SIZE             256     // CAN业务任务堆栈大小
 #define UART_TX_TASK_STACK_SIZE 						512 	// 串口发送任务的栈大小
 #define UART_RX_TASK_STACK_SIZE 						512 	// 串口接收任务的栈大小
 #define USART_SEND_TASK_STACK_SIZE 					512		// 发送任务堆栈大小
