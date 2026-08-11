@@ -49,6 +49,14 @@ typedef struct
 /*  read-only access to last parsed command (caller must not free)  */
 const WheelCommand *can_business_get_wheel_command(void);
 
+/*  safety-limited output Iq (clamped by CAN_WHEEL_IQ_TEST_LIMIT_A)
+ *  — what the motor tasks should actually use via Current_loop  */
+float can_business_get_left_iq_output(void);
+float can_business_get_right_iq_output(void);
+
+/*  call every poll cycle; zeros outputs when CAN command times out  */
+void can_business_tick(void);
+
 /*  process one received CAN frame
  *  return: E_OK = frame was consumed (matched & ACK-ed)
  *          E_PARAM = NULL pointer

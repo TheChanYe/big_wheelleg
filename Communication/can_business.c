@@ -16,9 +16,28 @@
 #endif
 #define MODE_LOG_TAG    MODULE_NAME
 
+/* ==========================  safety  ========================== */
+
+#define CAN_WHEEL_IQ_TEST_LIMIT_A   0.5f    /* first-stage validation clamp    */
+#define CAN_CMD_TIMEOUT_MS          100u    /* command-loss timeout            */
+
 /* ==========================  static state  ========================== */
 
 static WheelCommand g_wheel_cmd = {0};
+
+/*  outputs actually delivered to FOC (clamped, timeout-gated)  */
+static volatile float  g_left_iq_output   = 0.0f;
+static volatile float  g_right_iq_output  = 0.0f;
+static TickType_t      g_last_cmd_tick    = 0;
+
+/* ==========================  helpers  ========================== */
+
+static inline float clamp_f(float val, float lo, float hi)
+{
+    if (val < lo) return lo;
+    if (val > hi) return hi;
+    return val;
+}
 
 /* ==========================  Little-Endian helpers  ========================== */
 
@@ -100,8 +119,57 @@ int can_business_process_frame(uint16_t id,
     g_wheel_cmd.left_iq_ref  = (float)g_wheel_cmd.left_iq_raw  * 0.01f;
     g_wheel_cmd.right_iq_ref = (float)g_wheel_cmd.right_iq_raw * 0.01f;
 
-    /*  Send ACK with raw values  */
+    /*  Update command timestamp (even if disabled — proves we heard it)  */
+    g_last_cmd_tick = xTaskGetTickCount();
+
+    /*  Apply safety clamp + enable gate  */
+    if (g_wheel_cmd.enable)
+    {
+        g_left_iq_output  = clamp_f(g_wheel_cmd.left_iq_ref,
+                                    -CAN_WHEEL_IQ_TEST_LIMIT_A,
+                                     CAN_WHEEL_IQ_TEST_LIMIT_A);
+        g_right_iq_output = clamp_f(g_wheel_cmd.right_iq_ref,
+                                    -CAN_WHEEL_IQ_TEST_LIMIT_A,
+                                     CAN_WHEEL_IQ_TEST_LIMIT_A);
+    }
+    else
+    {
+        g_left_iq_output  = 0.0f;
+        g_right_iq_output = 0.0f;
+    }
+
+    /*  Send ACK with raw values (always reflects request, not clamped output)  */
     send_ack(&g_wheel_cmd);
 
     return E_OK;
+}
+
+/* ==========================  output accessors  ========================== */
+
+float can_business_get_left_iq_output(void)
+{
+    return g_left_iq_output;
+}
+
+float can_business_get_right_iq_output(void)
+{
+    return g_right_iq_output;
+}
+
+/* ==========================  timeout monitor  ==========================
+ *
+ *  Called every poll cycle from the business task.
+ *  If no valid 0x101 frame arrives within CAN_CMD_TIMEOUT_MS,
+ *  both outputs are forced to zero.
+ */
+
+void can_business_tick(void)
+{
+    TickType_t now = xTaskGetTickCount();
+
+    if ((now - g_last_cmd_tick) > pdMS_TO_TICKS(CAN_CMD_TIMEOUT_MS))
+    {
+        g_left_iq_output  = 0.0f;
+        g_right_iq_output = 0.0f;
+    }
 }

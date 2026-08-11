@@ -40,7 +40,6 @@ void can_business_task(void *pvParameters);         // CAN业务任务
 
 Motor_Data g_motor2 = {0};//电机2全局数据
 Motor_Data g_motor1 = {0};//电机1全局数据
-float trage = 10.0f;
 
 SemaphoreHandle_t mutex;//互斥锁句柄
 
@@ -118,7 +117,8 @@ void motor1_task(void *pvParameters) {
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 		if(g_motor1.run_state == RUN)
 		{
-			ret = CascadeControl_Run(&g_motor1, Speed_loop, trage);
+			ret = CascadeControl_Run(&g_motor1, Current_loop,
+				                        can_business_get_left_iq_output());
 				if(ret != E_OK)
 				{
 					g_motor1.run_state = FAULT;				
@@ -156,7 +156,8 @@ void motor2_task(void *pvParameters) {
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 		if(g_motor2.run_state == RUN)
 		{
-				ret = CascadeControl_Run(&g_motor2, Speed_loop, trage);
+				ret = CascadeControl_Run(&g_motor2, Current_loop,
+				                        can_business_get_right_iq_output());
 				if(ret != E_OK)
 				{
 					g_motor2.run_state = FAULT;		
@@ -270,6 +271,9 @@ void can_business_task(void *pvParameters) {
         {
             can_business_process_frame(id, data, len);
         }
+
+        /* safety: zero outputs on command timeout */
+        can_business_tick();
 
         vTaskDelay(pdMS_TO_TICKS(1));   /* 1ms poll interval */
     }
