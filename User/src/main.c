@@ -3,6 +3,7 @@
 #include "lcd.h"
 #include "foc.h"
 #include "my_usart.h"
+#include "my_can.h"
 
 #define MODULE_NAME       "main"
 
@@ -25,6 +26,12 @@ void motor2_task(void *pvParameters);//声明电机2任务
 
 TaskHandle_t StatusMonitoringTaskHandle = NULL;// 声明状态监测任务句柄
 void status_monitoring_task(void *pvParameters);//声明状态监测任务
+
+TaskHandle_t CanTestTaskHandle = NULL;           // CAN测试任务句柄
+void can_test_task(void *pvParameters);           // CAN测试任务
+
+TaskHandle_t CanLoopbackTestTaskHandle = NULL;     // CAN回环测试任务句柄
+void can_loopback_test_task(void *pvParameters);   // CAN回环测试任务
 
 
 Motor_Data g_motor2 = {0};//电机2全局数据
@@ -164,6 +171,77 @@ void motor2_task(void *pvParameters) {
 #endif
     }
 }
+/***********************CAN测试任务****************************/
+void can_test_task(void *pvParameters) {
+    int         ret;
+    uint16_t    counter = 0;
+    uint8_t     data[8];
+
+    /* 初始化 CAN1 */
+    ret = my_can_init();
+    if (ret != E_OK)
+    {
+        log_error("CAN test task: my_can_init failed");
+        vTaskDelete(NULL);
+    }
+
+    log_inform("CAN test task started (ID=0x%03X, 100ms, 1Mbps)", CAN_TEST_ID);
+
+    while (1)
+    {
+        data[0] = 0xCA;
+        data[1] = 0x4E;
+        data[2] = (uint8_t)(counter & 0xFF);
+        data[3] = (uint8_t)((counter >> 8) & 0xFF);
+        data[4] = 0x11;
+        data[5] = 0x22;
+        data[6] = 0x33;
+        data[7] = 0x44;
+
+        ret = my_can_send_std(CAN_TEST_ID, data, CAN_TEST_DLC);
+        if (ret != E_OK)
+        {
+            log_error("CAN TX failed (counter=%u)", counter);
+        }
+
+        counter++;
+        vTaskDelay(pdMS_TO_TICKS(100));   /* 100ms = 10Hz */
+    }
+}
+
+/***********************CAN回环测试任务****************************/
+void can_loopback_test_task(void *pvParameters) {
+    uint16_t    id;
+    uint8_t     data[8];
+    uint8_t     len;
+    int         ret;
+
+    /* init CAN1 with RX filter */
+    ret = my_can_init();
+    if (ret != E_OK)
+    {
+        log_error("CAN loopback: my_can_init failed");
+        vTaskDelete(NULL);
+    }
+
+    log_inform("CAN loopback test task started (RX 0x124 -> TX 0x125)");
+
+    while (1)
+    {
+        ret = my_can_receive_std(&id, data, &len);
+
+        if (ret == E_OK)
+        {
+            if (id == 0x124)
+            {
+                my_can_send_std(0x125, data, len);
+            }
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(1));   /* 1ms poll interval */
+    }
+}
+
 /***********************状态监测任务****************************/
 void status_monitoring_task(void *pvParameters) {
 	c_switch led = {0};
@@ -226,6 +304,30 @@ int main(void)
                     (UBaseType_t    )DISPALY_TASK_PRIORITY,
 										(TaskHandle_t*  )&DisplayTaskHandle) != pdPASS) {
         log_inform("Failed to create Dispaly task\n");
+    }
+#endif
+
+#if ENABLE_CAN_TX_TEST
+    // 创建CAN测试任务
+    if (xTaskCreate((TaskFunction_t )can_test_task,
+                    (const char*    )"CAN_Test_Task",
+                    (uint16_t       )CAN_TEST_TASK_STACK_SIZE,
+                    (void*          )NULL,
+                    (UBaseType_t    )CAN_TEST_TASK_PRIORITY,
+                    (TaskHandle_t*  )&CanTestTaskHandle) != pdPASS) {
+        log_inform("Failed to create CAN test task\n");
+    }
+#endif
+
+#if ENABLE_CAN_LOOPBACK_TEST
+    /* 创建CAN 回环测试任务 */
+    if (xTaskCreate((TaskFunction_t )can_loopback_test_task,
+                    (const char*    )"CAN_Loopback",
+                    (uint16_t       )CAN_TEST_TASK_STACK_SIZE,
+                    (void*          )NULL,
+                    (UBaseType_t    )CAN_TEST_TASK_PRIORITY,
+                    (TaskHandle_t*  )&CanLoopbackTestTaskHandle) != pdPASS) {
+        log_inform("Failed to create CAN loopback test task\n");
     }
 #endif
 

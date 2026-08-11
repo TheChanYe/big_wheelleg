@@ -100,6 +100,7 @@ virtualFolder:
         - path: ../HardwareLayer/my_usart.h
         - path: ../HardwareLayer/my_flash.c
         - path: ../HardwareLayer/my_flash.h
+        - path: ../HardwareLayer/my_can.c
       folders: []
     - name: DriverLayer
       files:
@@ -311,8 +312,8 @@ targets:
         baseAddr: ""
         bin: ""
         cpuInfo:
-          cpuName: "AT32F403ARGT7"
-          vendor: "Artery"
+          cpuName: AT32F403ARGT7
+          vendor: Artery
         otherCmds: ""
         proType: 1
         speed: 4000

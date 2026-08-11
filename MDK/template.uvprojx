@@ -712,6 +712,16 @@
               <FileType>5</FileType>
               <FilePath>..\HardwareLayer\my_flash.h</FilePath>
             </File>
+            <File>
+              <FileName>my_can.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HardwareLayer\my_can.c</FilePath>
+            </File>
+            <File>
+              <FileName>my_can.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\HardwareLayer\my_can.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

@@ -7,14 +7,15 @@
 高优先级任务必须进 vTaskDelay() 才会执行低优先级任务
 */
 typedef enum __TASK_PRO
-{  
-	DISPALY_TASK_PRIORITY = 1,					// 定义显示屏任务优先级  
-	USART_SEND_TASK_PRIORITY,				// 定义串口发送任务优先级  
-	UART_TASK_PRIORITY,						// 串口任务优先级 
-	STATUS_MOMITORING_TASK_PRIORITY,    //状态监测任务优先级 	
-	MOTOR1_TASK_PRIORITY ,				//电机1任务	
+{
+	CAN_TEST_TASK_PRIORITY = 1,				// CAN测试任务优先级（低于电机任务）
+	DISPALY_TASK_PRIORITY,					// 定义显示屏任务优先级
+	USART_SEND_TASK_PRIORITY,				// 定义串口发送任务优先级
+	UART_TASK_PRIORITY,						// 串口任务优先级
+	STATUS_MOMITORING_TASK_PRIORITY,    //状态监测任务优先级
+	MOTOR1_TASK_PRIORITY ,				//电机1任务
 	MOTOR2_TASK_PRIORITY,					//电机2任务
-	
+
 }task_pro;
 
 /*中断优先级,优先级值越小优先级越高*/
@@ -43,6 +44,7 @@ typedef enum __INTERRUPT_PRO
 } interrupt_pro;
 
 /*任务堆栈大小*/
+#define CAN_TEST_TASK_STACK_SIZE             256     // CAN测试任务堆栈大小
 #define UART_TX_TASK_STACK_SIZE 						512 	// 串口发送任务的栈大小
 #define UART_RX_TASK_STACK_SIZE 						512 	// 串口接收任务的栈大小
 #define USART_SEND_TASK_STACK_SIZE 					512		// 发送任务堆栈大小
