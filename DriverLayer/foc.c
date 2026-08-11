@@ -330,6 +330,23 @@ int Open_Motor(Motor_Data* motor)
 	}
 	return E_OK;
 }
+
+/* 复位电流环PI控制器 — 清零Id/Iq PID状态、Vd/Vq输出、电流目标 */
+int Motor_Reset_Current_Controller(Motor_Data *motor)
+{
+    if (motor == NULL)
+    {
+        log_error("Motor_Reset_Current_Controller: null pointer");
+        return E_PARAM;
+    }
+    PID_Reset(&motor->id_current_pid);
+    PID_Reset(&motor->iq_current_pid);
+    motor->voltage_dq.Vd = 0.0f;
+    motor->voltage_dq.Vq = 0.0f;
+    motor->control.id_current_target = 0.0f;
+    motor->control.iq_current_target = 0.0f;
+    return E_OK;
+}
 /*电机参数初始化*/
 int Motor_Init(Motor_Type motor)
 {
@@ -722,8 +739,6 @@ int CascadeControl_Run(Motor_Data* motor, Motor_Mode mode, float target)
 	}  
 	xSemaphoreGive(mutex);//释放互斥锁
 
-		/* update speed feedback from encoder — shared by all modes */
-		Motor_Update_Speed(motor);
 #if 1
 //	TickType_t current_tick = xTaskGetTickCount();  
 
@@ -750,6 +765,9 @@ int CascadeControl_Run(Motor_Data* motor, Motor_Mode mode, float target)
 			if(motor->control.speed_interval==0)
 			{
 				motor->control.speed_interval = SPEED_INTERVAL;
+
+			/* update speed feedback from encoder */
+			Motor_Update_Speed(motor);
 
 				//使用位置环时不需要执行斜坡函数
 				if(motor->mode.enable_position)//

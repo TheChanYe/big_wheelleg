@@ -10,6 +10,7 @@
 #include "my_can.h"
 #include "foc.h"
 
+extern Motor_Data g_motor1;   /* left wheel  */
 extern Motor_Data g_motor2;   /* right wheel */
 
 #define MODULE_NAME     "can_biz"
@@ -32,6 +33,7 @@ static WheelCommand g_wheel_cmd = {0};
 static volatile float  g_left_iq_output   = 0.0f;
 static volatile float  g_right_iq_output  = 0.0f;
 static TickType_t      g_last_cmd_tick    = 0;
+static uint8_t         g_cmd_active       = 0;    /* edge-triggered: 1=receiving valid cmd */
 
 /* ==========================  helpers  ========================== */
 
@@ -134,11 +136,19 @@ int can_business_process_frame(uint16_t id,
         g_right_iq_output = clamp_f(g_wheel_cmd.right_iq_ref,
                                     -CAN_WHEEL_IQ_TEST_LIMIT_A,
                                      CAN_WHEEL_IQ_TEST_LIMIT_A);
+        g_cmd_active = 1u;   /* receiving valid enabled commands */
     }
     else
     {
         g_left_iq_output  = 0.0f;
         g_right_iq_output = 0.0f;
+        /* edge: ACTIVE → DISABLED — reset PI once */
+        if (g_cmd_active)
+        {
+            Motor_Reset_Current_Controller(&g_motor1);
+            Motor_Reset_Current_Controller(&g_motor2);
+            g_cmd_active = 0u;
+        }
     }
 
     /*  Send ACK with raw values (always reflects request, not clamped output)  */
@@ -164,6 +174,8 @@ float can_business_get_right_iq_output(void)
  *  Called every poll cycle from the business task.
  *  If no valid 0x101 frame arrives within CAN_CMD_TIMEOUT_MS,
  *  both outputs are forced to zero.
+ *  Edge-triggered: only resets PI controllers on the FIRST tick
+ *  that crosses the timeout threshold (ACTIVE → TIMEOUT).
  */
 
 void can_business_tick(void)
@@ -174,6 +186,14 @@ void can_business_tick(void)
     {
         g_left_iq_output  = 0.0f;
         g_right_iq_output = 0.0f;
+
+        /* edge: ACTIVE → TIMEOUT — reset PI once */
+        if (g_cmd_active)
+        {
+            Motor_Reset_Current_Controller(&g_motor1);
+            Motor_Reset_Current_Controller(&g_motor2);
+            g_cmd_active = 0u;
+        }
     }
 }
 
@@ -218,4 +238,41 @@ void can_business_send_right_wheel_state(void)
     data[7] = g_wheel_cmd.enable ? 0x01u : 0x00u;
 
     my_can_send_std(CAN_ID_RIGHT_WHEEL_STATE, data, 8);
+}
+
+/* ==========================  right-wheel current diagnostic  ==========================
+ *
+ *  CAN ID 0x203, DLC=8, 50 Hz — phase & dq-axis current health.
+ *  byte0-1: Ia (int16 LE, 1 LSB = 0.001 A)
+ *  byte2-3: Ib (int16 LE, 1 LSB = 0.001 A)
+ *  byte4-5: Id (int16 LE, 1 LSB = 0.001 A)
+ *  byte6-7: Iq (int16 LE, 1 LSB = 0.001 A)
+ */
+
+void can_business_send_right_wheel_current_diag(void)
+{
+    uint8_t data[8];
+    int16_t ia_raw;
+    int16_t ib_raw;
+    int16_t id_raw;
+    int16_t iq_raw;
+
+    ia_raw = to_i16_sat(g_motor2.current_abc.Ia * 1000.0f);
+    ib_raw = to_i16_sat(g_motor2.current_abc.Ib * 1000.0f);
+    id_raw = to_i16_sat(g_motor2.current_dq.Id  * 1000.0f);
+    iq_raw = to_i16_sat(g_motor2.current_dq.Iq  * 1000.0f);
+
+    data[0] = (uint8_t)(ia_raw & 0xFF);
+    data[1] = (uint8_t)((ia_raw >> 8) & 0xFF);
+
+    data[2] = (uint8_t)(ib_raw & 0xFF);
+    data[3] = (uint8_t)((ib_raw >> 8) & 0xFF);
+
+    data[4] = (uint8_t)(id_raw & 0xFF);
+    data[5] = (uint8_t)((id_raw >> 8) & 0xFF);
+
+    data[6] = (uint8_t)(iq_raw & 0xFF);
+    data[7] = (uint8_t)((iq_raw >> 8) & 0xFF);
+
+    my_can_send_std(CAN_ID_RIGHT_WHEEL_CURRENT_DIAG, data, 8);
 }

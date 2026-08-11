@@ -9,9 +9,9 @@
 /*PID参数初始化*/
 int PID_Init(PID_Handle* pid, PID_Params* pid_params)
 {
-	if (pid == NULL || pid_params == NULL) 
+	if (pid == NULL || pid_params == NULL)
 	{
-		log_error("Parameter error!");	
+		log_error("Parameter error!");
 		return E_PARAM;
 	}
 	pid->kp = pid_params->kp;
@@ -27,10 +27,10 @@ int PID_Init(PID_Handle* pid, PID_Params* pid_params)
 }
 
 /* PID计算函数（含抗积分饱和） */
-int PID_Calc(PID_Handle* pid, float target, float current, float* output) 
+int PID_Calc(PID_Handle* pid, float target, float current, float* output)
 {
     if (pid == NULL || output == NULL) {
-		log_error("Parameter error!");	
+		log_error("Parameter error!");
         return E_PARAM;
     }
 
@@ -67,4 +67,19 @@ int PID_Calc(PID_Handle* pid, float target, float current, float* output)
     *output = clamped_output;
 
 	return E_OK;
+}
+
+/* PID复位 — 清零所有历史状态，输出归零 */
+int PID_Reset(PID_Handle* pid)
+{
+    if (pid == NULL)
+    {
+        log_error("PID_Reset: null pointer");
+        return E_PARAM;
+    }
+    pid->error      = 0.0f;
+    pid->integral   = 0.0f;
+    pid->prev_error = 0.0f;
+    pid->output     = 0.0f;
+    return E_OK;
 }

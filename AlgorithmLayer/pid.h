@@ -28,6 +28,9 @@ typedef struct {
 int PID_Init(PID_Handle* pid, PID_Params* pid_params);
 
 /*PID*/
-int PID_Calc(PID_Handle* pid, float target, float current, float* output); 
+int PID_Calc(PID_Handle* pid, float target, float current, float* output);
+
+/*PID复位 — 清零误差、积分、微分历史、输出*/
+int PID_Reset(PID_Handle* pid);
 #endif
 

@@ -17,6 +17,7 @@
 #define CAN_ID_WHEEL_COMMAND    0x101u   /* host → slave: wheel iq command   */
 #define CAN_ID_WHEEL_ACK             0x201u   /* slave → host: parsed ACK          */
 #define CAN_ID_RIGHT_WHEEL_STATE     0x202u   /* slave → host: right wheel state   */
+#define CAN_ID_RIGHT_WHEEL_CURRENT_DIAG 0x203u   /* slave → host: right wheel current diag */
 
 #define CAN_CMD_DLC              8u      /* fixed DLC for command & ACK       */
 
@@ -58,8 +59,15 @@ float can_business_get_right_iq_output(void);
 /*  call every poll cycle; zeros outputs when CAN command times out  */
 void can_business_tick(void);
 
-/*  send right-wheel state (rpm, velocity, angle) at 50 Hz via CAN  */
+/*  right-wheel state (FOC diagnostic) at 50 Hz via CAN 0x202  */
 void can_business_send_right_wheel_state(void);
+
+/*  right-wheel current diagnostic at 50 Hz via CAN 0x203
+ *  byte0-1: Ia (int16 LE, 1 LSB = 0.001 A)
+ *  byte2-3: Ib (int16 LE, 1 LSB = 0.001 A)
+ *  byte4-5: Id (int16 LE, 1 LSB = 0.001 A)
+ *  byte6-7: Iq (int16 LE, 1 LSB = 0.001 A)  */
+void can_business_send_right_wheel_current_diag(void);
 
 /*  process one received CAN frame
  *  return: E_OK = frame was consumed (matched & ACK-ed)
