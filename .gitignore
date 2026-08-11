@@ -1,0 +1,30 @@
+# Keil MDK
+Objects/
+Listings/
+*.axf
+*.elf
+*.hex
+*.bin
+*.map
+*.o
+*.d
+*.dep
+*.crf
+*.lst
+
+# MDK build/cache
+MDK/Objects/
+MDK/Listings/
+MDK/.vscode/
+
+# VSCode
+.vscode/
+
+# Build
+build/
+Build/
+
+# Temporary
+*.bak
+*.tmp
+*.log

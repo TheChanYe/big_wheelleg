@@ -1,0 +1,9 @@
+#ifndef MOTOR_ADC_H
+#define MOTOR_ADC_H
+#include "foc_cfg.h"
+
+float queryTemp(float r);
+
+int FOC_ADC_Init(Motor_Type motor);
+#endif
+

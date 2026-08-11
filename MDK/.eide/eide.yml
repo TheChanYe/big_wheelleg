@@ -1,0 +1,319 @@
+version: "4.1"
+name: template
+type: ARM
+deviceName: null
+packDir: null
+srcDirs: []
+virtualFolder:
+  name: <virtual_root>
+  files: []
+  folders:
+    - name: User
+      files: []
+      folders:
+        - name: inc
+          files:
+            - path: ../User/inc/at32f403a_407_clock.h
+            - path: ../User/inc/at32f403a_407_conf.h
+            - path: ../User/inc/at32f403a_407_int.h
+            - path: ../User/inc/FreeRTOSConfig.h
+            - path: ../User/inc/main.h
+          folders: []
+        - name: src
+          files:
+            - path: ../User/src/at32f403a_407_clock.c
+            - path: ../User/src/at32f403a_407_int.c
+            - path: ../User/src/include_port.c
+            - path: ../User/src/main.c
+          folders: []
+    - name: Firmware
+      files:
+        - path: ../Libraries/drivers/src/at32f403a_407_acc.c
+        - path: ../Libraries/drivers/src/at32f403a_407_adc.c
+        - path: ../Libraries/drivers/src/at32f403a_407_bpr.c
+        - path: ../Libraries/drivers/src/at32f403a_407_can.c
+        - path: ../Libraries/drivers/src/at32f403a_407_crc.c
+        - path: ../Libraries/drivers/src/at32f403a_407_crm.c
+        - path: ../Libraries/drivers/src/at32f403a_407_dac.c
+        - path: ../Libraries/drivers/src/at32f403a_407_debug.c
+        - path: ../Libraries/drivers/src/at32f403a_407_dma.c
+        - path: ../Libraries/drivers/src/at32f403a_407_emac.c
+        - path: ../Libraries/drivers/src/at32f403a_407_exint.c
+        - path: ../Libraries/drivers/src/at32f403a_407_flash.c
+        - path: ../Libraries/drivers/src/at32f403a_407_gpio.c
+        - path: ../Libraries/drivers/src/at32f403a_407_i2c.c
+        - path: ../Libraries/drivers/src/at32f403a_407_misc.c
+        - path: ../Libraries/drivers/src/at32f403a_407_pwc.c
+        - path: ../Libraries/drivers/src/at32f403a_407_rtc.c
+        - path: ../Libraries/drivers/src/at32f403a_407_sdio.c
+        - path: ../Libraries/drivers/src/at32f403a_407_spi.c
+        - path: ../Libraries/drivers/src/at32f403a_407_tmr.c
+        - path: ../Libraries/drivers/src/at32f403a_407_usart.c
+        - path: ../Libraries/drivers/src/at32f403a_407_usb.c
+        - path: ../Libraries/drivers/src/at32f403a_407_wdt.c
+        - path: ../Libraries/drivers/src/at32f403a_407_wwdt.c
+        - path: ../Libraries/drivers/src/at32f403a_407_xmc.c
+      folders: []
+    - name: cmsis
+      files:
+        - path: ../Libraries/cmsis/cm4/device_support/system_at32f403a_407.c
+        - path: ../Libraries/cmsis/cm4/device_support/startup/gcc/startup_at32f403a_407.s
+      folders: []
+    - name: Freertos
+      files:
+        - path: ../Freertos/source/croutine.c
+        - path: ../Freertos/source/event_groups.c
+        - path: ../Freertos/source/list.c
+        - path: ../Freertos/source/queue.c
+        - path: ../Freertos/source/stream_buffer.c
+        - path: ../Freertos/source/tasks.c
+        - path: ../Freertos/source/timers.c
+        - path: ../Freertos/source/portable/memmang/heap_4.c
+      folders: []
+    - name: Dsp
+      files:
+        - path: ../Libraries/cmsis/dsp/Source/CommonTables/arm_common_tables.c
+        - path: ../Libraries/cmsis/dsp/Source/FastMathFunctions/arm_cos_f32.c
+        - path: ../Libraries/cmsis/dsp/Source/FastMathFunctions/arm_sin_f32.c
+      folders: []
+    - name: System
+      files:
+        - path: ../AppLayer/system/delay.c
+        - path: ../AppLayer/system/delay.h
+        - path: ../AppLayer/system/sys_cfg.h
+      folders: []
+    - name: Tools
+      files:
+        - path: ../Tools/log.c
+        - path: ../Tools/log.h
+      folders: []
+    - name: HardwarelLayer
+      files:
+        - path: ../HardwareLayer/foc_cfg.h
+        - path: ../HardwareLayer/motor_adc.h
+        - path: ../HardwareLayer/motor_adc.c
+        - path: ../HardwareLayer/motor_timr.h
+        - path: ../HardwareLayer/motor_timr.c
+        - path: ../HardwareLayer/my_spi.c
+        - path: ../HardwareLayer/my_spi.h
+        - path: ../HardwareLayer/my_usart.c
+        - path: ../HardwareLayer/my_usart.h
+        - path: ../HardwareLayer/my_flash.c
+        - path: ../HardwareLayer/my_flash.h
+      folders: []
+    - name: DriverLayer
+      files:
+        - path: ../DriverLayer/switch.c
+        - path: ../DriverLayer/switch.h
+        - path: ../DriverLayer/lcd.c
+        - path: ../DriverLayer/lcd.h
+        - path: ../DriverLayer/lcd_font.h
+        - path: ../DriverLayer/as5047p.c
+        - path: ../DriverLayer/as5047p.h
+        - path: ../DriverLayer/drv8301.c
+        - path: ../DriverLayer/drv8301.h
+        - path: ../DriverLayer/foc.c
+        - path: ../DriverLayer/foc.h
+      folders: []
+    - name: AlgorithmLayer
+      files:
+        - path: ../AlgorithmLayer/pid.c
+        - path: ../AlgorithmLayer/pid.h
+        - path: ../AlgorithmLayer/ramp_generator.c
+        - path: ../AlgorithmLayer/ramp_generator.h
+        - path: ../AlgorithmLayer/lowpass_filter.c
+        - path: ../AlgorithmLayer/lowpass_filter.h
+        - path: ../AlgorithmLayer/foc_algorithm.c
+        - path: ../AlgorithmLayer/foc_algorithm.h
+      folders: []
+    - name: AppLayer
+      files: []
+      folders: []
+dependenceList: []
+outDir: build
+miscInfo:
+  uid: 735002eb302974026e8edcce941dc7f4
+targets:
+  Target_1:
+    cppPreprocessAttrs:
+      defineList:
+        - AT32F403ARGT7
+        - USE_STDPERIPH_DRIVER
+        - AT_START_F403A_V1
+        - ARM_MATH_CM4
+        - __TARGET_FPU_VFP
+        - __FPU_PRESENT
+      incList:
+        - ../Libraries/cmsis/dsp/include
+        - ../AppLayer/system
+        - ../Tools
+        - ../HardwareLayer
+        - ../DriverLayer
+        - ../AlgorithmLayer
+        - .cmsis/include
+        - RTE/_Target_1
+        - ../User/inc
+        - ../Libraries/cmsis/cm4/core_support
+        - ../Libraries/drivers/inc
+        - ../Libraries/cmsis/cm4/device_support
+        - ../Freertos/source/include
+        - ../Freertos/source/portable/memmang
+        - ../Freertos/source/portable/GCC/ARM_CM4F
+      libList: []
+    excludeList: []
+    settings:
+      debugger: cortex-debug
+    toolchain: GCC
+    toolchainConfigMap:
+      AC5:
+        archExtensions: ""
+        cpuType: Cortex-M4
+        floatingPointHardware: single
+        options:
+          version: 4
+          afterBuildTasks: []
+          asm-compiler:
+            defines: []
+          beforeBuildTasks: []
+          c/cpp-compiler:
+            CXX_FLAGS: --locale=english
+            C_FLAGS: --locale=english
+            c99-mode: true
+            one-elf-section-per-function: true
+            optimization: level-0
+            warnings: all-warnings
+          global:
+            output-debug-info: enable
+            use-microLIB: true
+          linker:
+            $outputTaskExcludes:
+              - .bin
+            misc-controls:
+              __text: ""
+            output-format: elf
+            ro-base: "0x08000000"
+            rw-base: "0x20000000"
+            xo-base: ""
+        scatterFilePath: ""
+        storageLayout:
+          RAM:
+            - id: 1
+              isChecked: false
+              mem:
+                size: "0x0"
+                startAddr: "0x0"
+              noInit: false
+              tag: RAM
+            - id: 2
+              isChecked: false
+              mem:
+                size: "0x0"
+                startAddr: "0x0"
+              noInit: false
+              tag: RAM
+            - id: 3
+              isChecked: false
+              mem:
+                size: "0x0"
+                startAddr: "0x0"
+              noInit: false
+              tag: RAM
+            - id: 1
+              isChecked: true
+              mem:
+                size: "0x38000"
+                startAddr: "0x20000000"
+              noInit: false
+              tag: IRAM
+            - id: 2
+              isChecked: false
+              mem:
+                size: "0x0"
+                startAddr: "0x0"
+              noInit: false
+              tag: IRAM
+          ROM:
+            - id: 1
+              isChecked: false
+              isStartup: false
+              mem:
+                size: "0x0"
+                startAddr: "0x0"
+              tag: ROM
+            - id: 2
+              isChecked: false
+              isStartup: false
+              mem:
+                size: "0x0"
+                startAddr: "0x0"
+              tag: ROM
+            - id: 3
+              isChecked: false
+              isStartup: false
+              mem:
+                size: "0x0"
+                startAddr: "0x0"
+              tag: ROM
+            - id: 1
+              isChecked: true
+              isStartup: true
+              mem:
+                size: "0x100000"
+                startAddr: "0x8000000"
+              tag: IROM
+            - id: 2
+              isChecked: false
+              isStartup: false
+              mem:
+                size: "0x0"
+                startAddr: "0x0"
+              tag: IROM
+        useCustomScatterFile: false
+      GCC:
+        archExtensions: ""
+        cpuType: Cortex-M4
+        floatingPointHardware: single
+        options:
+          version: 5
+          afterBuildTasks: []
+          asm-compiler:
+            ASM_FLAGS: ""
+          beforeBuildTasks: []
+          c/cpp-compiler:
+            CXX_FLAGS: ""
+            C_FLAGS: ""
+            language-c: c11
+            language-cpp: c++11
+            one-elf-section-per-data: true
+            one-elf-section-per-function: true
+            optimization: level-debug
+            warnings: all-warnings
+          global:
+            $float-abi-type: hard
+            misc-control: ""
+            not-use-syscalls: true
+            output-debug-info: enable
+            use-newlib-nano: true
+          linker:
+            $outputTaskExcludes:
+              - .bin
+            LD_FLAGS: ""
+            LIB_FLAGS: -lm
+            output-format: elf
+            remove-unused-input-sections: true
+        scatterFilePath: ../Libraries/cmsis/cm4/device_support/startup/gcc/linker/AT32F403AxG_FLASH.ld
+        storageLayout:
+          RAM: []
+          ROM: []
+        useCustomScatterFile: true
+    uploadConfigMap:
+      JLink:
+        baseAddr: ""
+        bin: ""
+        cpuInfo:
+          cpuName: "AT32F403ARGT7"
+          vendor: "Artery"
+        otherCmds: ""
+        proType: 1
+        speed: 4000
+    uploader: JLink
