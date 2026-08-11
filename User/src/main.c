@@ -253,6 +253,7 @@ void can_business_task(void *pvParameters) {
     uint8_t     data[8];
     uint8_t     len;
     int         ret;
+    TickType_t  last_state_tick = 0;
 
     /* CAN init once from business task */
     ret = my_can_init();
@@ -274,6 +275,14 @@ void can_business_task(void *pvParameters) {
 
         /* safety: zero outputs on command timeout */
         can_business_tick();
+
+        /* right-wheel state @ 50 Hz (20 ms) */
+        if ((xTaskGetTickCount() - last_state_tick)
+            >= pdMS_TO_TICKS(20))
+        {
+            last_state_tick = xTaskGetTickCount();
+            can_business_send_right_wheel_state();
+        }
 
         vTaskDelay(pdMS_TO_TICKS(1));   /* 1ms poll interval */
     }

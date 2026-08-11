@@ -8,6 +8,9 @@
 
 #include "can_business.h"
 #include "my_can.h"
+#include "foc.h"
+
+extern Motor_Data g_motor2;   /* right wheel */
 
 #define MODULE_NAME     "can_biz"
 
@@ -18,7 +21,7 @@
 
 /* ==========================  safety  ========================== */
 
-#define CAN_WHEEL_IQ_TEST_LIMIT_A   0.5f    /* first-stage validation clamp    */
+#define CAN_WHEEL_IQ_TEST_LIMIT_A   0.12f    /* first-stage validation clamp    */
 #define CAN_CMD_TIMEOUT_MS          100u    /* command-loss timeout            */
 
 /* ==========================  static state  ========================== */
@@ -172,4 +175,54 @@ void can_business_tick(void)
         g_left_iq_output  = 0.0f;
         g_right_iq_output = 0.0f;
     }
+}
+
+/* ==========================  right-wheel state  ==========================
+ *
+ *  CAN ID 0x202, DLC=8, 50 Hz.
+ *  byte0-1: rpm     (int16_t, 1 LSB = 1 RPM)
+ *  byte2-3: velocity(int16_t, 1 LSB = 0.1 rad/s)
+ *  byte4-5: angle   (uint16_t, 1 LSB = 0.001 rad)
+ *  byte6:   enable flag
+ *  byte7:   reserved = 0
+ */
+
+static int16_t to_i16_sat(float val)
+{
+    if (val > 32767.0f) return 32767;
+    if (val < -32768.0f) return -32768;
+    return (int16_t)val;
+}
+
+static uint16_t to_u16_sat(float val)
+{
+    if (val > 65535.0f) return 65535;
+    if (val < 0.0f) return 0;
+    return (uint16_t)val;
+}
+
+void can_business_send_right_wheel_state(void)
+{
+    uint8_t  data[8];
+    int16_t  rpm_raw;
+    int16_t  vel_raw;
+    uint16_t angle_raw;
+
+    rpm_raw   = to_i16_sat(g_motor2.rpm);
+    vel_raw   = to_i16_sat(g_motor2.velocity * 10.0f);
+    angle_raw = to_u16_sat(g_motor2.angle_data * 1000.0f);
+
+    data[0] = (uint8_t)(rpm_raw & 0xFF);
+    data[1] = (uint8_t)((rpm_raw >> 8) & 0xFF);
+
+    data[2] = (uint8_t)(vel_raw & 0xFF);
+    data[3] = (uint8_t)((vel_raw >> 8) & 0xFF);
+
+    data[4] = (uint8_t)(angle_raw & 0xFF);
+    data[5] = (uint8_t)((angle_raw >> 8) & 0xFF);
+
+    data[6] = g_wheel_cmd.enable ? 1u : 0u;
+    data[7] = 0x00u;
+
+    my_can_send_std(CAN_ID_RIGHT_WHEEL_STATE, data, 8);
 }

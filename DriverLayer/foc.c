@@ -529,71 +529,56 @@ int Get_Mos_Temp(Motor_Data* motor)
 //    }
 //}
 
-/*获取电机速度*/
 /**
-  * @brief  获取电机转速（带圈数统计和滤波）
-  * @retval 滤波后的转速值（RPM）
+  * @brief  基于真实机械角与时间差计算速度（rad/s + RPM）
+  * @note   使用原始 angle_data，不加滤波；所有控制模式共用
+  * @retval E_OK / E_PARAM
   */
-static int Get_Motor_Speed(Motor_Data* motor)
+int Motor_Update_Speed(Motor_Data *motor)
 {
-	int ret = 0;
-    /*-- 1. 角度滤波处理 --*/
-    // 应用低通滤波器获取平滑角度
-     ret = LPF_Update(&motor->Filter_angle, motor->angle_data, &motor->filter_angle);
-    /*-- 2. 计算这一次与上一次的角度差 --*/
-    motor->delta_raw = motor->filter_angle - motor->angle_prev;
-	/*-- 5. 更新上一次的角度数据 --*/
-	motor->angle_prev =  motor->filter_angle;    
-    // 处理角度突变（超过0.5圈视为跨圈）
-    if(fabs(motor->delta_raw) > 0.8f * cpr) {
-        // 判断旋转方向
-        motor->delta_raw > 0 ? motor->circle_num-- : motor->circle_num++;
-    } 
+    TickType_t now;
+    TickType_t dt_tick;
+    float dt;
+    float delta;
 
-	//处理电机正反转
-	if(motor->delta_raw<-PI)
-		motor->delta_raw=motor->delta_raw+cpr;
-	else if(motor->delta_raw>PI)
-		motor->delta_raw=motor->delta_raw-cpr;	
+    if (motor == NULL)
+        return E_PARAM;
 
-    /*-- 4. 速度计算 --*/
-    // 获取时间差（考虑FreeRTOS tick溢出）单位S
-    motor->current_tick = xTaskGetTickCount();
-    motor->angle_dt = (float)(motor->current_tick - motor->last_tick) * portTICK_PERIOD_MS / 1000.0f;
-	//更新时间
-		motor->last_tick = motor->current_tick;  	
-	// 确保时间间隔合理
-	if ( motor->angle_dt <= 0.0f) {
-			 motor->angle_dt =0.001f; // 最小时间间隔
-	} else if ( motor->angle_dt > 0.1f) { 
-			motor->angle_dt = 0.01f;// 最大时间间隔10ms
-	}  
+    now = xTaskGetTickCount();
 
-    // 时间有效性检查
-    if(motor->first_run==0) {
+    if (motor->first_run == 0)
+    {
         motor->first_run = 1;
-//				motor->velocity = 0.0f;
-    } 
-	else
-	{
-		// 计算角速度（rad/s）弧度每秒
-//		motor->velocity = motor->delta_raw / motor->angle_dt; 
-	motor->velocity=motor->delta_raw*60.0f/PI*200;
-		// 转换为RPM：rad/s -> RPM/S = (rad/s) * (60秒/分钟) / (2π弧度/转)
-		motor->rpm = motor->velocity / cpr;	
-		ret = LPF_Update(&motor->Filter_speed,motor->rpm, &motor->filter_speed);
-		if(ret != E_OK)
-		{
-			log_error("LPF UPdate failed.");	
-			return E_ERROR;		
-		}		
-  }
+        motor->angle_prev = motor->angle_data;
+        motor->last_tick  = now;
+        motor->velocity   = 0.0f;
+        motor->rpm        = 0.0f;
+        return E_OK;
+    }
 
-	
-	/*-- 6. 返回滤波后的角速度 --*/
+    dt_tick = now - motor->last_tick;
 
-   
-	return E_OK;
+    /* same RTOS tick — skip to avoid div-by-zero  */
+    if (dt_tick == 0)
+        return E_OK;
+
+    dt = (float)dt_tick * (float)portTICK_PERIOD_MS * 0.001f;
+
+    delta = motor->angle_data - motor->angle_prev;
+
+    /* handle 0 ↔ 2π wrap  */
+    while (delta > PI)
+        delta -= 2.0f * PI;
+    while (delta < -PI)
+        delta += 2.0f * PI;
+
+    motor->velocity = delta / dt;                      /* rad/s           */
+    motor->rpm      = motor->velocity * 60.0f / cpr;   /* RPM             */
+
+    motor->angle_prev = motor->angle_data;
+    motor->last_tick  = now;
+
+    return E_OK;
 }
 	
 /**
@@ -736,6 +721,9 @@ int CascadeControl_Run(Motor_Data* motor, Motor_Mode mode, float target)
 		}
 	}  
 	xSemaphoreGive(mutex);//释放互斥锁
+
+		/* update speed feedback from encoder — shared by all modes */
+		Motor_Update_Speed(motor);
 #if 1
 //	TickType_t current_tick = xTaskGetTickCount();  
 
@@ -762,8 +750,6 @@ int CascadeControl_Run(Motor_Data* motor, Motor_Mode mode, float target)
 			if(motor->control.speed_interval==0)
 			{
 				motor->control.speed_interval = SPEED_INTERVAL;
-				// 获取速度反馈
-				Get_Motor_Speed(motor);
 
 				//使用位置环时不需要执行斜坡函数
 				if(motor->mode.enable_position)//

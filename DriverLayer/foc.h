@@ -14,6 +14,7 @@ int Motor_Init(Motor_Type motor);
 int Close_Motor(Motor_Data* motor);
 int Open_Motor(Motor_Data* motor);
 int Get_Mos_Temp(Motor_Data* motor);
+int Motor_Update_Speed(Motor_Data *motor);
 ///*获取电机速度*/
 //float GetMotorPreSpeed(void);
 
