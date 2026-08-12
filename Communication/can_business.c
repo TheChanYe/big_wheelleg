@@ -145,7 +145,12 @@ int can_business_process_frame(uint16_t id, const uint8_t *data, uint8_t len)
     g_speed_cmd.motor1_speed_ref = (float)g_speed_cmd.motor1_speed_raw * 0.1f;
     g_motor_mode = CAN_MOTOR_MODE_SPEED;
 
-    if (g_speed_cmd.enable)
+    if (g_speed_cmd.enable && g_speed_cmd.motor0_speed_raw == 0)
+    {
+        Motor_Reset_Speed_Controller(&g_motor1);
+        g_cmd_active = 1u;
+    }
+    else if (g_speed_cmd.enable)
     {
         g_cmd_active = 1u;
     }

@@ -2,8 +2,8 @@
 
 #define MOTOR_SPEED_IQ_LIMIT_A                 0.30f
 #define MOTOR_SPEED_START_THRESHOLD_RAD_S      1.0f
-#define MOTOR_SPEED_START_IQ_A                 0.50f
-#define MOTOR_SPEED_START_MAX_MS                500u
+#define MOTOR_SPEED_START_IQ_A                 0.60f
+#define MOTOR_SPEED_START_MAX_MS                400u
 #define MOTOR_SPEED_TARGET_DEADBAND_RAD_S      0.10f
 #define MODULE_NAME  "foc"
 #ifdef  MODE_LOG_TAG
@@ -808,12 +808,6 @@ int CascadeControl_Run(Motor_Data* motor, Motor_Mode mode, float target)
 
                 Motor_Reset_Speed_Controller(motor);
             }
-            else if (motor == &g_motor1
-                     && !motor->mode.enable_position
-                     && motor->control.speed_startup_failed)
-            {
-                motor->control.iq_current_target = 0.0f;
-            }
             else
             {
                 PID_Calc(&motor->speed_pid, motor->control.speed_target,
@@ -841,14 +835,12 @@ int CascadeControl_Run(Motor_Data* motor, Motor_Mode mode, float target)
                     }
                     else
                     {
-                        motor->control.iq_current_target = 0.0f;
                         motor->control.speed_startup_boost_active = 0u;
                         motor->control.speed_startup_failed = 1u;
-                        PID_Reset(&motor->speed_pid);
                     }
                 }
                 else if (motor == &g_motor1
-                         && fabsf(motor->velocity) >= MOTOR_SPEED_START_THRESHOLD_RAD_S)
+                         && !motor->mode.enable_position)
                 {
                     motor->control.speed_startup_boost_active = 0u;
                 }
