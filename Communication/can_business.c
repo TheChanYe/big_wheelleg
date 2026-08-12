@@ -24,6 +24,75 @@ static CanMotorMode      g_motor_mode = CAN_MOTOR_MODE_CURRENT;
 static TickType_t        g_last_cmd_tick = 0;
 static uint8_t           g_cmd_active = 0;
 static volatile uint32_t g_can_telemetry_tx_fail = 0u;
+static TickType_t        g_last_state_tick = 0;
+static uint8_t           g_diag_pending = 0u;
+
+int can_business_init(void)
+{
+    int ret = my_can_init();
+    if (ret == E_OK)
+        log_inform("CAN business task started (RX 0x101/0x102)");
+    return ret;
+}
+
+void can_business_process(void)
+{
+    uint16_t id;
+    uint8_t data[8];
+    uint8_t len;
+    TickType_t now;
+
+    /* 每个周期清空 FIFO，保持原任务的处理顺序。 */
+    while (my_can_receive_std(&id, data, &len) == E_OK)
+        can_business_process_frame(id, data, len);
+
+    can_business_tick();
+    now = xTaskGetTickCount();
+
+    if ((now - g_last_state_tick) >= pdMS_TO_TICKS(20))
+    {
+        g_last_state_tick = now;
+        can_business_send_motor0_speed_state();
+        can_business_send_motor1_speed_state();
+        g_diag_pending = 1u;
+    }
+
+    if (g_diag_pending && (now - g_last_state_tick) >= pdMS_TO_TICKS(1))
+    {
+        can_business_send_motor0_speed_diag();
+        can_business_send_motor1_speed_diag();
+        g_diag_pending = 0u;
+    }
+}
+
+void can_business_tx_test_process(void)
+{
+    static uint16_t counter = 0;
+    uint8_t data[8];
+
+    data[0] = 0xCA;
+    data[1] = 0x4E;
+    data[2] = (uint8_t)(counter & 0xFF);
+    data[3] = (uint8_t)((counter >> 8) & 0xFF);
+    data[4] = 0x11;
+    data[5] = 0x22;
+    data[6] = 0x33;
+    data[7] = 0x44;
+
+    if (my_can_send_std(CAN_TEST_ID, data, CAN_TEST_DLC) != E_OK)
+        log_error("CAN TX failed (counter=%u)", counter);
+    counter++;
+}
+
+void can_business_loopback_test_process(void)
+{
+    uint16_t id;
+    uint8_t data[8];
+    uint8_t len;
+
+    if (my_can_receive_std(&id, data, &len) == E_OK && id == 0x124)
+        my_can_send_std(0x125, data, len);
+}
 
 static inline float clamp_f(float val, float lo, float hi)
 {

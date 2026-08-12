@@ -1,4 +1,5 @@
 #include "my_usart.h"
+#include "task_config.h"
 #define MODULE_NAME "my_usart"
 
 #ifdef MODE_LOG_TAG

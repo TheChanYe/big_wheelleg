@@ -637,6 +637,13 @@
               <FileType>5</FileType>
               <FilePath>..\AppLayer\system\sys_cfg.h</FilePath>
             </File>
+            <File><FileName>system_init.c</FileName><FileType>1</FileType><FilePath>..\AppLayer\system\system_init.c</FilePath></File>
+            <File><FileName>system_init.h</FileName><FileType>5</FileType><FilePath>..\AppLayer\system\system_init.h</FilePath></File>
+            <File><FileName>app_tasks.c</FileName><FileType>1</FileType><FilePath>..\AppLayer\system\app_tasks.c</FilePath></File>
+            <File><FileName>app_tasks.h</FileName><FileType>5</FileType><FilePath>..\AppLayer\system\app_tasks.h</FilePath></File>
+            <File><FileName>task_config.h</FileName><FileType>5</FileType><FilePath>..\AppLayer\system\task_config.h</FilePath></File>
+            <File><FileName>system_monitor.c</FileName><FileType>1</FileType><FilePath>..\AppLayer\system\system_monitor.c</FilePath></File>
+            <File><FileName>system_monitor.h</FileName><FileType>5</FileType><FilePath>..\AppLayer\system\system_monitor.h</FilePath></File>
           </Files>
         </Group>
         <Group>
@@ -831,6 +838,10 @@
         </Group>
         <Group>
           <GroupName>AppLayer</GroupName>
+          <Files>
+            <File><FileName>motor_service.c</FileName><FileType>1</FileType><FilePath>..\AppLayer\motor_control\motor_service.c</FilePath></File>
+            <File><FileName>motor_service.h</FileName><FileType>5</FileType><FilePath>..\AppLayer\motor_control\motor_service.h</FilePath></File>
+          </Files>
         </Group>
         <Group>
           <GroupName>Communication</GroupName>
@@ -845,6 +856,8 @@
               <FileType>5</FileType>
               <FilePath>..\Communication\can_business.h</FilePath>
             </File>
+            <File><FileName>uart_business.c</FileName><FileType>1</FileType><FilePath>..\Communication\uart_business.c</FilePath></File>
+            <File><FileName>uart_business.h</FileName><FileType>5</FileType><FilePath>..\Communication\uart_business.h</FilePath></File>
           </Files>
         </Group>
       </Groups>

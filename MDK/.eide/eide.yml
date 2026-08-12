@@ -81,6 +81,14 @@ virtualFolder:
         - path: ../AppLayer/system/delay.c
         - path: ../AppLayer/system/delay.h
         - path: ../AppLayer/system/sys_cfg.h
+
+        - path: ../AppLayer/system/system_init.c
+        - path: ../AppLayer/system/system_init.h
+        - path: ../AppLayer/system/app_tasks.c
+        - path: ../AppLayer/system/app_tasks.h
+        - path: ../AppLayer/system/task_config.h
+        - path: ../AppLayer/system/system_monitor.c
+        - path: ../AppLayer/system/system_monitor.h
       folders: []
     - name: Tools
       files:
@@ -129,11 +137,18 @@ virtualFolder:
       folders: []
     - name: AppLayer
       files: []
-      folders: []
+      folders:
+        - name: motor_control
+          files:
+            - path: ../AppLayer/motor_control/motor_service.c
+            - path: ../AppLayer/motor_control/motor_service.h
+          folders: []
     - name: Communication
       files:
         - path: ../Communication/can_business.c
         - path: ../Communication/can_business.h
+        - path: ../Communication/uart_business.c
+        - path: ../Communication/uart_business.h
       folders: []
 dependenceList: []
 outDir: build
@@ -152,6 +167,7 @@ targets:
       incList:
         - ../Libraries/cmsis/dsp/include
         - ../AppLayer/system
+        - ../AppLayer/motor_control
         - ../Tools
         - ../HardwareLayer
         - ../DriverLayer

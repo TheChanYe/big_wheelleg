@@ -1,5 +1,6 @@
 #include "motor_adc.h"
 #include "foc.h"
+#include "app_tasks.h"
 #define MODULE_NAME       "motor_adc"
 
 #ifdef  MODE_LOG_TAG
@@ -9,8 +10,6 @@
 
 extern Motor_Data g_motor1;//电机1全局数据
 extern Motor_Data g_motor2;//电机2全局数据
-extern TaskHandle_t Motor1TaskHandle;
-extern TaskHandle_t Motor2TaskHandle;
 // ADC采样值数组（每个电机3个通道）
 uint16_t adc_preempt_value_motor1[3];
 uint16_t adc_preempt_value_motor2[3];
@@ -228,7 +227,7 @@ void ADC1_2_IRQHandler(void)
 			
 			BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 			//向目标任务发送任务通知，已唤醒任务
-			vTaskNotifyGiveFromISR(Motor1TaskHandle, &xHigherPriorityTaskWoken);
+			vTaskNotifyGiveFromISR(g_motor0_task_handle, &xHigherPriorityTaskWoken);
 			// 如果有更高优先级的任务被唤醒，执行上下文切换
 			portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 #endif
@@ -285,7 +284,7 @@ void ADC3_IRQHandler(void)
 #else
 			BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 			//向目标任务发送任务通知，已唤醒任务
-			vTaskNotifyGiveFromISR(Motor2TaskHandle, &xHigherPriorityTaskWoken);//
+			vTaskNotifyGiveFromISR(g_motor1_task_handle, &xHigherPriorityTaskWoken);//
 			// 如果有更高优先级的任务被唤醒，执行上下文切换
 			portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 #endif

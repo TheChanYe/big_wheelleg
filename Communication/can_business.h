@@ -48,6 +48,14 @@ typedef enum
 } CanMotorMode;
 
 const WheelCommand *can_business_get_wheel_command(void);
+/** 功能：初始化 CAN BSP 与 CAN 业务状态；参数：无；返回值：初始化结果。 */
+int can_business_init(void);
+/** 功能：执行一次 CAN 接收、超时处理和原有遥测发送；参数：无；返回值：无。 */
+void can_business_process(void);
+/** 功能：执行一次原有 CAN 周期发送测试；参数：无；返回值：无。 */
+void can_business_tx_test_process(void);
+/** 功能：执行一次原有 CAN 回环测试；参数：无；返回值：无。 */
+void can_business_loopback_test_process(void);
 float can_business_get_motor0_iq_output(void);
 float can_business_get_motor1_iq_output(void);
 CanMotorMode can_business_get_motor_mode(void);
