@@ -117,8 +117,16 @@ void motor1_task(void *pvParameters) {
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 		if(g_motor1.run_state == RUN)
 		{
-			ret = CascadeControl_Run(&g_motor1, Current_loop,
-				                        can_business_get_left_iq_output());
+			if (can_business_get_motor_mode() == CAN_MOTOR_MODE_SPEED)
+			{
+				ret = CascadeControl_Run(&g_motor1, Speed_loop,
+					                        can_business_get_motor0_speed_target());
+			}
+			else
+			{
+				ret = CascadeControl_Run(&g_motor1, Current_loop,
+					                        can_business_get_motor0_iq_output());
+			}
 				if(ret != E_OK)
 				{
 					g_motor1.run_state = FAULT;				
@@ -157,7 +165,7 @@ void motor2_task(void *pvParameters) {
 		if(g_motor2.run_state == RUN)
 		{
 				ret = CascadeControl_Run(&g_motor2, Current_loop,
-				                        can_business_get_right_iq_output());
+					                        can_business_get_motor1_iq_output());
 				if(ret != E_OK)
 				{
 					g_motor2.run_state = FAULT;		
@@ -263,7 +271,7 @@ void can_business_task(void *pvParameters) {
         vTaskDelete(NULL);
     }
 
-    log_inform("CAN business task started (RX 0x101 cmd -> 0x201 ACK)");
+    log_inform("CAN business task started (RX 0x101/0x102)");
 
     while (1)
     {
@@ -276,13 +284,12 @@ void can_business_task(void *pvParameters) {
         /* safety: zero outputs on command timeout */
         can_business_tick();
 
-        /* right-wheel telemetry @ 50 Hz (20 ms) */
+        /* MOTOR0 speed telemetry @ 50 Hz (20 ms) */
         if ((xTaskGetTickCount() - last_state_tick)
             >= pdMS_TO_TICKS(20))
         {
             last_state_tick = xTaskGetTickCount();
-            can_business_send_right_wheel_state();        /* 0x202: FOC diagnostic */
-            can_business_send_right_wheel_current_diag(); /* 0x203: current diagnostic */
+            can_business_send_motor0_speed_state();
         }
 
         vTaskDelay(pdMS_TO_TICKS(1));   /* 1ms poll interval */

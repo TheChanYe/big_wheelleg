@@ -1,4 +1,6 @@
 #include "foc.h"
+
+#define MOTOR_SPEED_TEST_IQ_LIMIT_A  0.30f
 #define MODULE_NAME  "foc"
 #ifdef  MODE_LOG_TAG
 #undef  MODE_LOG_TAG
@@ -780,8 +782,16 @@ int CascadeControl_Run(Motor_Data* motor, Motor_Mode mode, float target)
 					// 执行速度设置斜坡函数
 					Ramp_Execute(&motor->ramp_speed, motor->velocity,motor->control.speed_target, &motor->control.speed_feedback);	
 					// 执行速度环PID计算
-					PID_Calc(&motor->speed_pid, motor->control.speed_feedback, motor->velocity, &motor->control.iq_current_target);				
-				}				
+					PID_Calc(&motor->speed_pid, motor->control.speed_feedback, motor->velocity, &motor->control.iq_current_target);
+				}
+				if (motor->control.iq_current_target > MOTOR_SPEED_TEST_IQ_LIMIT_A)
+				{
+					motor->control.iq_current_target = MOTOR_SPEED_TEST_IQ_LIMIT_A;
+				}
+				else if (motor->control.iq_current_target < -MOTOR_SPEED_TEST_IQ_LIMIT_A)
+				{
+					motor->control.iq_current_target = -MOTOR_SPEED_TEST_IQ_LIMIT_A;
+				}
 			}
 			else
 			motor->control.speed_interval--;

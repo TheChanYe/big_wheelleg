@@ -1,9 +1,7 @@
 /**
  ******************************************************************************
  * @file     can_business.h
- * @brief    CAN business layer - command/ACK protocol on top of my_can
- * @note     Receives 0x101 (WheelCommand), responds 0x201 (ACK).
- *           Does NOT control FOC. Protocol validation only.
+ * @brief    CAN motor command and MOTOR0 speed-state protocol.
  ******************************************************************************
  */
 
@@ -12,67 +10,50 @@
 
 #include "main.h"
 
-/* ==========================  CAN ID definition  ========================== */
+#define CAN_ID_WHEEL_COMMAND          0x101u
+#define CAN_ID_MOTOR_SPEED_COMMAND    0x102u
+#define CAN_ID_WHEEL_ACK              0x201u
+#define CAN_ID_MOTOR0_SPEED_STATE     0x202u
 
-#define CAN_ID_WHEEL_COMMAND    0x101u   /* host → slave: wheel iq command   */
-#define CAN_ID_WHEEL_ACK             0x201u   /* slave → host: parsed ACK          */
-#define CAN_ID_RIGHT_WHEEL_STATE     0x202u   /* slave → host: right wheel state   */
-#define CAN_ID_RIGHT_WHEEL_CURRENT_DIAG 0x203u   /* slave → host: right wheel current diag */
-
-#define CAN_CMD_DLC              8u      /* fixed DLC for command & ACK       */
-
-/* ==========================  flag bits  ========================== */
-
-#define CAN_CMD_FLAG_ENABLE     0x01u    /* bit0: enable (1) / disable (0)    */
-
-/* ==========================  WheelCommand  ==========================
- *
- *  Holds both CAN raw values and converted engineering values,
- *  1 LSB = 0.01 A (int16_t, little-endian on wire).
- */
+#define CAN_CMD_DLC                   8u
+#define CAN_CMD_FLAG_ENABLE           0x01u
 
 typedef struct
 {
-    /*  raw CAN payload (exactly as received)  */
-    int16_t   left_iq_raw;
-    int16_t   right_iq_raw;
-
-    /*  converted engineering values  */
-    float     left_iq_ref;         /*  A   */
-    float     right_iq_ref;        /*  A   */
-
-    /*  protocol fields  */
-    uint16_t  sequence;
-    uint8_t   enable;              /*  0 = disable, 1 = enable  */
+    int16_t  motor0_iq_raw;
+    int16_t  motor1_iq_raw;
+    float    motor0_iq_ref;
+    float    motor1_iq_ref;
+    uint16_t sequence;
+    uint8_t  enable;
 } WheelCommand;
 
-/* ==========================  public API  ========================== */
+typedef struct
+{
+    int16_t  motor0_speed_raw;
+    int16_t  motor1_speed_raw;
+    float    motor0_speed_ref;
+    float    motor1_speed_ref;
+    uint16_t sequence;
+    uint8_t  enable;
+} MotorSpeedCommand;
 
-/*  read-only access to last parsed command (caller must not free)  */
+typedef enum
+{
+    CAN_MOTOR_MODE_CURRENT = 0,
+    CAN_MOTOR_MODE_SPEED
+} CanMotorMode;
+
 const WheelCommand *can_business_get_wheel_command(void);
+float can_business_get_motor0_iq_output(void);
+float can_business_get_motor1_iq_output(void);
+CanMotorMode can_business_get_motor_mode(void);
+float can_business_get_motor0_speed_target(void);
+float can_business_get_motor1_speed_target(void);
 
-/*  safety-limited output Iq (clamped by CAN_WHEEL_IQ_TEST_LIMIT_A)
- *  — what the motor tasks should actually use via Current_loop  */
-float can_business_get_left_iq_output(void);
-float can_business_get_right_iq_output(void);
-
-/*  call every poll cycle; zeros outputs when CAN command times out  */
 void can_business_tick(void);
+void can_business_send_motor0_speed_state(void);
 
-/*  right-wheel state (FOC diagnostic) at 50 Hz via CAN 0x202  */
-void can_business_send_right_wheel_state(void);
-
-/*  right-wheel current diagnostic at 50 Hz via CAN 0x203
- *  byte0-1: Ia (int16 LE, 1 LSB = 0.001 A)
- *  byte2-3: Ib (int16 LE, 1 LSB = 0.001 A)
- *  byte4-5: Id (int16 LE, 1 LSB = 0.001 A)
- *  byte6-7: Iq (int16 LE, 1 LSB = 0.001 A)  */
-void can_business_send_right_wheel_current_diag(void);
-
-/*  process one received CAN frame
- *  return: E_OK = frame was consumed (matched & ACK-ed)
- *          E_PARAM = NULL pointer
- *          CAN_RX_EMPTY = ignored (not our ID or malformed)  */
 int can_business_process_frame(uint16_t id,
                                const uint8_t *data,
                                uint8_t len);
