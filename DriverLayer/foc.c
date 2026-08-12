@@ -1,13 +1,20 @@
 #include "foc.h"
 
 #define MOTOR_SPEED_IQ_LIMIT_A                 0.30f
-#define MOTOR_SPEED_START_IQ_A                 0.60f
+#define MOTOR_SPEED_START_IQ_STAGE1_A          0.60f
+#define MOTOR_SPEED_START_STAGE1_MS             200u
+#define MOTOR_SPEED_START_IQ_STAGE2_A          0.75f
 #define MOTOR_SPEED_START_MIN_MS                40u
 #define MOTOR_SPEED_START_CONFIRM_RAD_S        0.50f
 #define MOTOR_SPEED_START_CONFIRM_MS           20u
 #define MOTOR_SPEED_START_MAX_MS                400u
-#define MOTOR_SPEED_START_HANDOFF_IQ_A         0.18f
 #define MOTOR_SPEED_TARGET_DEADBAND_RAD_S      0.10f
+#define MOTOR_SPEED_LOW_REGION_RAD_S            4.0f
+#define MOTOR_SPEED_FRICTION_IQ_A              0.18f
+#define MOTOR_SPEED_COAST_MARGIN_RAD_S         0.20f
+#define MOTOR_SPEED_LOW_KP                     0.02f
+#define MOTOR_SPEED_LOW_KI_PER_S               0.20f
+#define MOTOR_SPEED_LOW_I_LIMIT_A              0.18f
 #define MODULE_NAME  "foc"
 #ifdef  MODE_LOG_TAG
 #undef  MODE_LOG_TAG
@@ -58,6 +65,121 @@ static const PID_Params position_params = {
     .integral_max = 1.0f,
     .output_max = 150.0f
 };
+
+static float clamp_f(float value, float min_value, float max_value)
+{
+    if (value < min_value)
+        return min_value;
+    if (value > max_value)
+        return max_value;
+    return value;
+}
+
+static void Motor_Speed_Startup_Run(Motor_Data *motor, TickType_t now)
+{
+    TickType_t elapsed;
+    float target = motor->control.speed_target;
+    float direction = (target > 0.0f) ? 1.0f : -1.0f;
+    float startup_iq;
+
+    if (motor->control.speed_startup_tick == 0)
+    {
+        motor->control.speed_startup_tick = now;
+        motor->control.speed_startup_confirm_tick = 0;
+        motor->control.speed_startup_boost_active = 1u;
+        motor->control.speed_startup_failed = 0u;
+        PID_Reset(&motor->speed_pid);
+    }
+
+    elapsed = now - motor->control.speed_startup_tick;
+    if (elapsed >= pdMS_TO_TICKS(MOTOR_SPEED_START_MAX_MS))
+    {
+        motor->control.speed_startup_boost_active = 0u;
+        motor->control.speed_startup_confirm_tick = 0;
+        motor->control.speed_startup_failed = 1u;
+        motor->control.iq_current_target = 0.0f;
+        PID_Reset(&motor->speed_pid);
+        return;
+    }
+
+    if (elapsed >= pdMS_TO_TICKS(MOTOR_SPEED_START_MIN_MS)
+        && target * motor->velocity > 0.0f
+        && fabsf(motor->velocity) >= MOTOR_SPEED_START_CONFIRM_RAD_S)
+    {
+        if (motor->control.speed_startup_confirm_tick == 0)
+        {
+            motor->control.speed_startup_confirm_tick = now;
+        }
+        else if ((now - motor->control.speed_startup_confirm_tick)
+                 >= pdMS_TO_TICKS(MOTOR_SPEED_START_CONFIRM_MS))
+        {
+            /* 确认真实旋转后清除 PI 历史，下一周期进入正常速度控制。 */
+            motor->control.speed_startup_boost_active = 0u;
+            motor->control.speed_startup_confirm_tick = 0;
+            motor->control.iq_current_target = 0.0f;
+            PID_Reset(&motor->speed_pid);
+            return;
+        }
+    }
+    else
+    {
+        /* 速度跌落或反向时重新确认，但本次命令不重新开始 startup。 */
+        motor->control.speed_startup_confirm_tick = 0;
+    }
+
+    startup_iq = (elapsed < pdMS_TO_TICKS(MOTOR_SPEED_START_STAGE1_MS))
+        ? MOTOR_SPEED_START_IQ_STAGE1_A : MOTOR_SPEED_START_IQ_STAGE2_A;
+    motor->control.iq_current_target = direction * startup_iq;
+}
+
+static float Motor_LowSpeed_Control(Motor_Data *motor, float target,
+                                    float feedback, float dt_s)
+{
+    float direction = (target > 0.0f) ? 1.0f : -1.0f;
+    float speed_direction = feedback * direction;
+    float overspeed = speed_direction - fabsf(target);
+    float ff_scale = 1.0f;
+    float friction_ff;
+    float p_term;
+    float iq_unclamped;
+    float iq_clamped;
+
+    if (overspeed >= MOTOR_SPEED_COAST_MARGIN_RAD_S)
+    {
+        /* 明显超速时仅滑行，禁止通过反向 Iq 主动制动。 */
+        PID_Reset(&motor->speed_pid);
+        return 0.0f;
+    }
+
+    if (overspeed > 0.0f)
+        ff_scale = clamp_f(1.0f - overspeed / MOTOR_SPEED_COAST_MARGIN_RAD_S,
+                           0.0f, 1.0f);
+
+    friction_ff = direction * MOTOR_SPEED_FRICTION_IQ_A * ff_scale;
+    p_term = MOTOR_SPEED_LOW_KP * (target - feedback);
+    motor->speed_pid.integral += (target - feedback)
+        * MOTOR_SPEED_LOW_KI_PER_S * dt_s;
+    motor->speed_pid.integral = clamp_f(motor->speed_pid.integral,
+                                        -MOTOR_SPEED_LOW_I_LIMIT_A,
+                                        MOTOR_SPEED_LOW_I_LIMIT_A);
+
+    iq_unclamped = friction_ff + p_term + motor->speed_pid.integral;
+    iq_clamped = clamp_f(iq_unclamped * direction, 0.0f,
+                         MOTOR_SPEED_IQ_LIMIT_A) * direction;
+
+    if (iq_clamped != iq_unclamped)
+    {
+        /* 输出限幅时回算积分，防止低速区积分继续向限幅方向累积。 */
+        motor->speed_pid.integral = clamp_f(iq_clamped - friction_ff - p_term,
+                                            -MOTOR_SPEED_LOW_I_LIMIT_A,
+                                            MOTOR_SPEED_LOW_I_LIMIT_A);
+    }
+
+    motor->speed_pid.prev_error = target - feedback;
+    motor->speed_pid.error = target - feedback;
+    motor->speed_pid.output = iq_clamped;
+    return iq_clamped;
+}
 
 
 
@@ -803,82 +925,46 @@ int CascadeControl_Run(Motor_Data* motor, Motor_Mode mode, float target)
     if(motor->mode.enable_speed)
     {
         TickType_t now = xTaskGetTickCount();
+        TickType_t elapsed_tick = now - motor->control.speed_last_tick;
 
-        if ((now - motor->control.speed_last_tick) >= pdMS_TO_TICKS(SPEED_INTERVAL))
+        if (elapsed_tick >= pdMS_TO_TICKS(SPEED_INTERVAL))
         {
+            float dt_s = (float)elapsed_tick * (float)portTICK_PERIOD_MS * 0.001f;
             motor->control.speed_last_tick = now;
-            if (!motor->mode.enable_position
-                && fabsf(motor->control.speed_target) < MOTOR_SPEED_TARGET_DEADBAND_RAD_S)
-            {
 
-                Motor_Reset_Speed_Controller(motor);
+            if (motor->mode.enable_position)
+            {
+                /* Position Mode 保持原有级联速度 PI。 */
+                PID_Calc(&motor->speed_pid, motor->control.speed_target,
+                         motor->velocity, &motor->control.iq_current_target);
             }
             else
             {
-                PID_Calc(&motor->speed_pid, motor->control.speed_target,
-                         motor->velocity, &motor->control.iq_current_target);
+                float target = motor->control.speed_target;
 
-                /* 每次非零速度运动只允许一次启动补偿，确认失败也不重新尝试。 */
-                if (!motor->mode.enable_position
-                    && motor->control.speed_startup_tick == 0
-                    && !motor->control.speed_startup_failed)
+                if (fabsf(target) < MOTOR_SPEED_TARGET_DEADBAND_RAD_S)
                 {
-                    motor->control.speed_startup_tick = now;
-                    motor->control.speed_startup_confirm_tick = 0;
-                    motor->control.speed_startup_boost_active = 1u;
+                    Motor_Reset_Speed_Controller(motor);
                 }
-
-                if (motor->control.speed_startup_boost_active)
+                else if (motor->control.speed_startup_failed)
                 {
-                    if ((now - motor->control.speed_startup_tick)
-                        >= pdMS_TO_TICKS(MOTOR_SPEED_START_MAX_MS))
-                    {
-                        motor->control.speed_startup_boost_active = 0u;
-                        motor->control.speed_startup_failed = 1u;
-                        motor->control.iq_current_target = 0.0f;
-                    }
-                    else
-                    {
-                        if ((now - motor->control.speed_startup_tick)
-                            >= pdMS_TO_TICKS(MOTOR_SPEED_START_MIN_MS)
-                            && motor->control.speed_target * motor->velocity > 0.0f
-                            && fabsf(motor->velocity)
-                                >= MOTOR_SPEED_START_CONFIRM_RAD_S)
-                        {
-                            if (motor->control.speed_startup_confirm_tick == 0)
-                                motor->control.speed_startup_confirm_tick = now;
-                            else if ((now - motor->control.speed_startup_confirm_tick)
-                                     >= pdMS_TO_TICKS(MOTOR_SPEED_START_CONFIRM_MS))
-                            {
-                                /* 连续运动确认后以较小积分值平滑交还给速度 PI。 */
-                                motor->control.speed_startup_boost_active = 0u;
-                                motor->speed_pid.integral =
-                                    (motor->control.speed_target > 0.0f)
-                                    ? MOTOR_SPEED_START_HANDOFF_IQ_A
-                                    : -MOTOR_SPEED_START_HANDOFF_IQ_A;
-                                motor->speed_pid.prev_error =
-                                    motor->control.speed_target - motor->velocity;
-                            }
-                        }
-                        else
-                        {
-                            /* 速度跌落或反向时重新开始连续确认，不重新执行 startup。 */
-                            motor->control.speed_startup_confirm_tick = 0;
-                        }
-
-                        if (motor->control.speed_startup_boost_active)
-                        {
-                            motor->control.iq_current_target =
-                                (motor->control.speed_target > 0.0f)
-                                ? MOTOR_SPEED_START_IQ_A : -MOTOR_SPEED_START_IQ_A;
-                        }
-                    }
-                }
-                else if (!motor->mode.enable_position
-                         && motor->control.speed_startup_failed)
-                {
-                    /* 启动超时后本次非零命令保持零扭矩，等待真正停车命令解锁。 */
                     motor->control.iq_current_target = 0.0f;
+                }
+                else if (motor->control.speed_startup_tick == 0
+                         || motor->control.speed_startup_boost_active)
+                {
+                    /* Startup 期间不调用 Speed PI，避免积分积累影响交接。 */
+                    Motor_Speed_Startup_Run(motor, now);
+                }
+                else if (fabsf(target) <= MOTOR_SPEED_LOW_REGION_RAD_S)
+                {
+                    motor->control.iq_current_target = Motor_LowSpeed_Control(
+                        motor, target, motor->velocity, dt_s);
+                }
+                else
+                {
+                    PID_Calc(&motor->speed_pid, target, motor->velocity,
+                             &motor->control.iq_current_target);
                 }
             }
         }
