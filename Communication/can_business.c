@@ -53,6 +53,7 @@ static void reset_controllers(void)
     Motor_Reset_Current_Controller(&g_motor1);
     Motor_Reset_Current_Controller(&g_motor2);
     Motor_Reset_Speed_Controller(&g_motor1);
+    Motor_Reset_Speed_Controller(&g_motor2);
 }
 
 static void disable_command(void)
@@ -130,11 +131,13 @@ int can_business_process_frame(uint16_t id, const uint8_t *data, uint8_t len)
         return E_OK;
     }
 
-    if (g_motor1.control.speed_startup_failed
-        && (g_motor_mode != CAN_MOTOR_MODE_SPEED
-            || get_u16_le(&data[4]) != g_speed_cmd.sequence))
+    if (g_motor_mode != CAN_MOTOR_MODE_SPEED
+        || get_u16_le(&data[4]) != g_speed_cmd.sequence)
     {
-        Motor_Reset_Speed_Controller(&g_motor1);
+        if (g_motor1.control.speed_startup_failed)
+            Motor_Reset_Speed_Controller(&g_motor1);
+        if (g_motor2.control.speed_startup_failed)
+            Motor_Reset_Speed_Controller(&g_motor2);
     }
 
     g_speed_cmd.motor0_speed_raw = get_i16_le(&data[0]);
@@ -145,13 +148,12 @@ int can_business_process_frame(uint16_t id, const uint8_t *data, uint8_t len)
     g_speed_cmd.motor1_speed_ref = (float)g_speed_cmd.motor1_speed_raw * 0.1f;
     g_motor_mode = CAN_MOTOR_MODE_SPEED;
 
-    if (g_speed_cmd.enable && g_speed_cmd.motor0_speed_raw == 0)
+    if (g_speed_cmd.enable)
     {
-        Motor_Reset_Speed_Controller(&g_motor1);
-        g_cmd_active = 1u;
-    }
-    else if (g_speed_cmd.enable)
-    {
+        if (g_speed_cmd.motor0_speed_raw == 0)
+            Motor_Reset_Speed_Controller(&g_motor1);
+        if (g_speed_cmd.motor1_speed_raw == 0)
+            Motor_Reset_Speed_Controller(&g_motor2);
         g_cmd_active = 1u;
     }
     else
@@ -174,11 +176,11 @@ void can_business_tick(void)
         disable_command();
 }
 
-void can_business_send_motor0_speed_state(void)
+static void send_speed_state(uint16_t id, Motor_Data *motor, float target)
 {
     uint8_t data[8];
-    int16_t cmd_raw = to_i16_sat(g_speed_cmd.motor0_speed_ref * 10.0f);
-    int16_t measured_raw = to_i16_sat(g_motor1.velocity * 10.0f);
+    int16_t cmd_raw = to_i16_sat(target * 10.0f);
+    int16_t measured_raw = to_i16_sat(motor->velocity * 10.0f);
 
     data[0] = (uint8_t)(cmd_raw & 0xFF);
     data[1] = (uint8_t)((cmd_raw >> 8) & 0xFF);
@@ -186,19 +188,19 @@ void can_business_send_motor0_speed_state(void)
     data[3] = (uint8_t)((measured_raw >> 8) & 0xFF);
     data[4] = (uint8_t)(g_speed_cmd.sequence & 0xFF);
     data[5] = (uint8_t)((g_speed_cmd.sequence >> 8) & 0xFF);
-    data[6] = g_motor1.run_state;
+    data[6] = motor->run_state;
     data[7] = (g_cmd_active ? 0x01u : 0x00u)
             | (g_motor_mode == CAN_MOTOR_MODE_SPEED ? 0x02u : 0x00u);
 
-    my_can_send_std(CAN_ID_MOTOR0_SPEED_STATE, data, CAN_CMD_DLC);
+    my_can_send_std(id, data, CAN_CMD_DLC);
 }
 
-void can_business_send_motor0_speed_diag(void)
+static void send_speed_diag(uint16_t id, Motor_Data *motor)
 {
     uint8_t data[8];
-    int16_t iq_target_raw = to_i16_sat(g_motor1.control.iq_current_target * 1000.0f);
-    int16_t iq_feedback_raw = to_i16_sat(g_motor1.control.iq_current_feedback * 1000.0f);
-    int16_t vq_raw = to_i16_sat(g_motor1.voltage_dq.Vq * 1000.0f);
+    int16_t iq_target_raw = to_i16_sat(motor->control.iq_current_target * 1000.0f);
+    int16_t iq_feedback_raw = to_i16_sat(motor->control.iq_current_feedback * 1000.0f);
+    int16_t vq_raw = to_i16_sat(motor->voltage_dq.Vq * 1000.0f);
 
     data[0] = (uint8_t)(iq_target_raw & 0xFF);
     data[1] = (uint8_t)((iq_target_raw >> 8) & 0xFF);
@@ -206,8 +208,30 @@ void can_business_send_motor0_speed_diag(void)
     data[3] = (uint8_t)((iq_feedback_raw >> 8) & 0xFF);
     data[4] = (uint8_t)(vq_raw & 0xFF);
     data[5] = (uint8_t)((vq_raw >> 8) & 0xFF);
-    data[6] = Motor_Is_Speed_Startup_Boost_Active(&g_motor1) ? 0x01u : 0x00u;
+    data[6] = Motor_Is_Speed_Startup_Boost_Active(motor) ? 0x01u : 0x00u;
     data[7] = 0x00u;
 
-    my_can_send_std(CAN_ID_MOTOR0_SPEED_DIAG, data, CAN_CMD_DLC);
+    my_can_send_std(id, data, CAN_CMD_DLC);
+}
+
+void can_business_send_motor0_speed_state(void)
+{
+    send_speed_state(CAN_ID_MOTOR0_SPEED_STATE, &g_motor1,
+                     g_speed_cmd.motor0_speed_ref);
+}
+
+void can_business_send_motor1_speed_state(void)
+{
+    send_speed_state(CAN_ID_MOTOR1_SPEED_STATE, &g_motor2,
+                     g_speed_cmd.motor1_speed_ref);
+}
+
+void can_business_send_motor0_speed_diag(void)
+{
+    send_speed_diag(CAN_ID_MOTOR0_SPEED_DIAG, &g_motor1);
+}
+
+void can_business_send_motor1_speed_diag(void)
+{
+    send_speed_diag(CAN_ID_MOTOR1_SPEED_DIAG, &g_motor2);
 }

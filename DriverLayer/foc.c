@@ -813,8 +813,7 @@ int CascadeControl_Run(Motor_Data* motor, Motor_Mode mode, float target)
                 PID_Calc(&motor->speed_pid, motor->control.speed_target,
                          motor->velocity, &motor->control.iq_current_target);
 
-                if (motor == &g_motor1
-                    && !motor->mode.enable_position
+                if (!motor->mode.enable_position
                     && !motor->control.speed_startup_failed
                     && fabsf(motor->control.speed_target)
                         >= MOTOR_SPEED_TARGET_DEADBAND_RAD_S
@@ -839,8 +838,7 @@ int CascadeControl_Run(Motor_Data* motor, Motor_Mode mode, float target)
                         motor->control.speed_startup_failed = 1u;
                     }
                 }
-                else if (motor == &g_motor1
-                         && !motor->mode.enable_position)
+                else if (!motor->mode.enable_position)
                 {
                     motor->control.speed_startup_boost_active = 0u;
                 }
