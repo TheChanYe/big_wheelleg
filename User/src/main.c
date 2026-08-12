@@ -290,6 +290,7 @@ void can_business_task(void *pvParameters) {
         {
             last_state_tick = xTaskGetTickCount();
             can_business_send_motor0_speed_state();
+            can_business_send_motor0_speed_diag();
         }
 
         vTaskDelay(pdMS_TO_TICKS(1));   /* 1ms poll interval */

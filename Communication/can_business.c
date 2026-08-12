@@ -180,3 +180,22 @@ void can_business_send_motor0_speed_state(void)
 
     my_can_send_std(CAN_ID_MOTOR0_SPEED_STATE, data, CAN_CMD_DLC);
 }
+
+void can_business_send_motor0_speed_diag(void)
+{
+    uint8_t data[8];
+    int16_t iq_target_raw = to_i16_sat(g_motor1.control.iq_current_target * 1000.0f);
+    int16_t iq_feedback_raw = to_i16_sat(g_motor1.control.iq_current_feedback * 1000.0f);
+    int16_t vq_raw = to_i16_sat(g_motor1.voltage_dq.Vq * 1000.0f);
+
+    data[0] = (uint8_t)(iq_target_raw & 0xFF);
+    data[1] = (uint8_t)((iq_target_raw >> 8) & 0xFF);
+    data[2] = (uint8_t)(iq_feedback_raw & 0xFF);
+    data[3] = (uint8_t)((iq_feedback_raw >> 8) & 0xFF);
+    data[4] = (uint8_t)(vq_raw & 0xFF);
+    data[5] = (uint8_t)((vq_raw >> 8) & 0xFF);
+    data[6] = Motor_Is_Speed_Startup_Boost_Active(&g_motor1) ? 0x01u : 0x00u;
+    data[7] = 0x00u;
+
+    my_can_send_std(CAN_ID_MOTOR0_SPEED_DIAG, data, CAN_CMD_DLC);
+}

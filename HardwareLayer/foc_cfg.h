@@ -14,6 +14,8 @@
 #define CURRENT_INTERVAL   1  // 电流环1ms
 #define SPEED_INTERVAL    5  // 速度环5ms（电流环的10倍）
 #define POSITION_INTERVAL 10  // 位置环100ms（速度环的10倍）
+#define MOTOR_SPEED_ESTIMATE_MS 5u
+#define MOTOR_SPEED_LPF_TF      0.010f
 
 /*****************定时器参数*******************************/
 #define TMR_CLOCK 240000000                                          // 定时器时钟频率 240MHz
@@ -183,6 +185,7 @@ typedef struct {
     float iq_current_feedback;
     float speed_feedback;
     float position_feedback;
+    uint8_t speed_startup_boost_active;
 } MotorControl;
 
 /*电机参数结构体*/

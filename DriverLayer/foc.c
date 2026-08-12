@@ -1,6 +1,9 @@
 #include "foc.h"
 
-#define MOTOR_SPEED_TEST_IQ_LIMIT_A  0.30f
+#define MOTOR_SPEED_IQ_LIMIT_A                 0.30f
+#define MOTOR_SPEED_START_THRESHOLD_RAD_S      0.5f
+#define MOTOR_SPEED_START_IQ_A                 0.30f
+#define MOTOR_SPEED_TARGET_DEADBAND_RAD_S      0.10f
 #define MODULE_NAME  "foc"
 #ifdef  MODE_LOG_TAG
 #undef  MODE_LOG_TAG
@@ -33,14 +36,14 @@ static const PID_Params velocity_params = {
     .kp = 0.15f,
     .ki = 0.1f,
     .kd = 0.01f,
-    .integral_max =6.0f,
-    .output_max = 100.0f//速度最大输出为 SPEED_MAX / 60 = 100 RPM/S
+    .integral_max = MOTOR_SPEED_IQ_LIMIT_A,
+    .output_max = MOTOR_SPEED_IQ_LIMIT_A
 #else
     .kp = 0.02f,
     .ki = 0.05f,
     .kd = 0.0f,
-    .integral_max = 6.0f,
-    .output_max = 13.9f
+    .integral_max = MOTOR_SPEED_IQ_LIMIT_A,
+    .output_max = MOTOR_SPEED_IQ_LIMIT_A
 #endif	
 };
 
@@ -347,6 +350,7 @@ int Motor_Reset_Current_Controller(Motor_Data *motor)
     motor->voltage_dq.Vq = 0.0f;
     motor->control.id_current_target = 0.0f;
     motor->control.iq_current_target = 0.0f;
+    motor->control.speed_startup_boost_active = 0u;
     return E_OK;
 }
 /*电机参数初始化*/
@@ -439,8 +443,8 @@ int Motor_Init(Motor_Type motor)
 		log_error("current LPF init failed.");	
 		return E_ERROR;
 	}  
-    //速度滤波器：时间常数0.01s（中等响应）
-    ret = LPF_Init(&g_motor->Filter_speed, 0.000000001f);   
+    //速度滤波器：时间常数10ms
+    ret = LPF_Init(&g_motor->Filter_speed, MOTOR_SPEED_LPF_TF);
 	if(ret != E_OK)
 	{
 		log_error("speed LPF init failed.");	
@@ -549,16 +553,17 @@ int Get_Mos_Temp(Motor_Data* motor)
 //}
 
 /**
-  * @brief  基于真实机械角与时间差计算速度（rad/s + RPM）
-  * @note   使用原始 angle_data，不加滤波；所有控制模式共用
+ * @brief  基于累计机械角变化估算速度（rad/s + RPM）
+ * @note   每5ms更新一次，并对原始速度进行低通滤波；所有控制模式共用
   * @retval E_OK / E_PARAM
   */
 int Motor_Update_Speed(Motor_Data *motor)
 {
     TickType_t now;
     TickType_t dt_tick;
-    float dt;
     float delta;
+    float dt;
+    float raw_speed;
 
     if (motor == NULL)
         return E_PARAM;
@@ -569,35 +574,44 @@ int Motor_Update_Speed(Motor_Data *motor)
     {
         motor->first_run = 1;
         motor->angle_prev = motor->angle_data;
-        motor->last_tick  = now;
-        motor->velocity   = 0.0f;
-        motor->rpm        = 0.0f;
+        motor->last_tick = now;
+        motor->delta_raw = 0.0f;
+        motor->velocity = 0.0f;
+        motor->filter_speed = 0.0f;
+        motor->rpm = 0.0f;
         return E_OK;
     }
 
-    dt_tick = now - motor->last_tick;
-
-    /* same RTOS tick — skip to avoid div-by-zero  */
-    if (dt_tick == 0)
-        return E_OK;
-
-    dt = (float)dt_tick * (float)portTICK_PERIOD_MS * 0.001f;
-
     delta = motor->angle_data - motor->angle_prev;
-
-    /* handle 0 ↔ 2π wrap  */
     while (delta > PI)
         delta -= 2.0f * PI;
     while (delta < -PI)
         delta += 2.0f * PI;
 
-    motor->velocity = delta / dt;                      /* rad/s           */
-    motor->rpm      = motor->velocity * 60.0f / cpr;   /* RPM             */
-
     motor->angle_prev = motor->angle_data;
-    motor->last_tick  = now;
+    motor->delta_raw += delta;
+
+    dt_tick = now - motor->last_tick;
+    if (dt_tick < pdMS_TO_TICKS(MOTOR_SPEED_ESTIMATE_MS))
+        return E_OK;
+
+    dt = (float)dt_tick * (float)portTICK_PERIOD_MS * 0.001f;
+    if (dt <= 0.0f)
+        return E_OK;
+
+    raw_speed = motor->delta_raw / dt;
+    LPF_Update(&motor->Filter_speed, raw_speed, &motor->filter_speed);
+    motor->velocity = motor->filter_speed;
+    motor->rpm = motor->velocity * 60.0f / (2.0f * PI);
+    motor->delta_raw = 0.0f;
+    motor->last_tick = now;
 
     return E_OK;
+}
+
+uint8_t Motor_Is_Speed_Startup_Boost_Active(const Motor_Data *motor)
+{
+    return (motor != NULL) ? motor->control.speed_startup_boost_active : 0u;
 }
 	
 /**
@@ -654,8 +668,9 @@ static int Motor_Control_Init(Motor_Data* motor)
     // 初始值清零
     motor->control.position_target = 0.0f;
     motor->control.speed_target = 0.0f;
-    motor->control.id_current_target = 0.0f;
-    motor->control.iq_current_target = 0.0f;
+	motor->control.id_current_target = 0.0f;
+	motor->control.iq_current_target = 0.0f;
+	motor->control.speed_startup_boost_active = 0u;
 	return E_OK;	
 }
 
@@ -738,8 +753,9 @@ int CascadeControl_Run(Motor_Data* motor, Motor_Mode mode, float target)
 			xSemaphoreGive(mutex);//释放互斥锁
 			return E_ERROR;					
 		}
-	}  
+	}
 	xSemaphoreGive(mutex);//释放互斥锁
+	Motor_Update_Speed(motor);
 
 #if 1
 //	TickType_t current_tick = xTaskGetTickCount();  
@@ -761,40 +777,41 @@ int CascadeControl_Run(Motor_Data* motor, Motor_Mode mode, float target)
     }
 
     /*====== 速度环计算 ======*/
-    if(motor->mode.enable_speed) 
+    if(motor->mode.enable_speed)
     {
-			// 检查是否到达执行周期
-			if(motor->control.speed_interval==0)
-			{
-				motor->control.speed_interval = SPEED_INTERVAL;
+        TickType_t now = xTaskGetTickCount();
 
-			/* update speed feedback from encoder */
-			Motor_Update_Speed(motor);
+        if ((now - motor->control.speed_last_tick) >= pdMS_TO_TICKS(SPEED_INTERVAL))
+        {
+            motor->control.speed_last_tick = now;
+            motor->control.speed_startup_boost_active = 0u;
 
-				//使用位置环时不需要执行斜坡函数
-				if(motor->mode.enable_position)//
-				{
-						// 执行速度环PID计算
-					PID_Calc(&motor->speed_pid, motor->control.speed_target, motor->velocity, &motor->control.iq_current_target);					
-				}
-				else
-				{
-					// 执行速度设置斜坡函数
-					Ramp_Execute(&motor->ramp_speed, motor->velocity,motor->control.speed_target, &motor->control.speed_feedback);	
-					// 执行速度环PID计算
-					PID_Calc(&motor->speed_pid, motor->control.speed_feedback, motor->velocity, &motor->control.iq_current_target);
-				}
-				if (motor->control.iq_current_target > MOTOR_SPEED_TEST_IQ_LIMIT_A)
-				{
-					motor->control.iq_current_target = MOTOR_SPEED_TEST_IQ_LIMIT_A;
-				}
-				else if (motor->control.iq_current_target < -MOTOR_SPEED_TEST_IQ_LIMIT_A)
-				{
-					motor->control.iq_current_target = -MOTOR_SPEED_TEST_IQ_LIMIT_A;
-				}
-			}
-			else
-			motor->control.speed_interval--;
+            if (!motor->mode.enable_position
+                && fabsf(motor->control.speed_target) < MOTOR_SPEED_TARGET_DEADBAND_RAD_S)
+            {
+                motor->control.speed_target = 0.0f;
+                motor->control.iq_current_target = 0.0f;
+                PID_Reset(&motor->speed_pid);
+            }
+            else
+            {
+                PID_Calc(&motor->speed_pid, motor->control.speed_target,
+                         motor->velocity, &motor->control.iq_current_target);
+
+                if (!motor->mode.enable_position
+                    && fabsf(motor->velocity) < MOTOR_SPEED_START_THRESHOLD_RAD_S)
+                {
+                    motor->control.iq_current_target =
+                        (motor->control.speed_target > 0.0f)
+                        ? MOTOR_SPEED_START_IQ_A : -MOTOR_SPEED_START_IQ_A;
+                    motor->control.speed_startup_boost_active = 1u;
+                }
+            }
+        }
+    }
+    else
+    {
+        motor->control.speed_startup_boost_active = 0u;
     }
 
     /*====== 电流环计算 ======*/

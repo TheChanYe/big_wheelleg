@@ -14,6 +14,7 @@
 #define CAN_ID_MOTOR_SPEED_COMMAND    0x102u
 #define CAN_ID_WHEEL_ACK              0x201u
 #define CAN_ID_MOTOR0_SPEED_STATE     0x202u
+#define CAN_ID_MOTOR0_SPEED_DIAG      0x203u
 
 #define CAN_CMD_DLC                   8u
 #define CAN_CMD_FLAG_ENABLE           0x01u
@@ -53,6 +54,7 @@ float can_business_get_motor1_speed_target(void);
 
 void can_business_tick(void);
 void can_business_send_motor0_speed_state(void);
+void can_business_send_motor0_speed_diag(void);
 
 int can_business_process_frame(uint16_t id,
                                const uint8_t *data,
