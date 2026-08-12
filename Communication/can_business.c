@@ -13,7 +13,7 @@
 extern Motor_Data g_motor1;   /* physical MOTOR0: TMR1 */
 extern Motor_Data g_motor2;   /* physical MOTOR1: TMR8 */
 
-#define CAN_WHEEL_IQ_TEST_LIMIT_A  0.3f
+#define CAN_WHEEL_IQ_TEST_LIMIT_A  0.8f
 #define CAN_CMD_TIMEOUT_MS         100u
 
 static WheelCommand      g_wheel_cmd = {0};

@@ -1,7 +1,7 @@
 #include "foc.h"
 
 #define MOTOR_SPEED_IQ_LIMIT_A                 0.30f
-#define MOTOR_SPEED_START_THRESHOLD_RAD_S      1.0f
+#define MOTOR_SPEED_START_EXIT_RAD_S           0.20f
 #define MOTOR_SPEED_START_IQ_A                 0.60f
 #define MOTOR_SPEED_START_MAX_MS                400u
 #define MOTOR_SPEED_TARGET_DEADBAND_RAD_S      0.10f
@@ -813,34 +813,37 @@ int CascadeControl_Run(Motor_Data* motor, Motor_Mode mode, float target)
                 PID_Calc(&motor->speed_pid, motor->control.speed_target,
                          motor->velocity, &motor->control.iq_current_target);
 
+                /*
+                 * 每次非零速度运动只允许一次启动补偿。
+                 * speed_startup_tick 非零表示本次运动已尝试，必须等待目标回零才会解锁。
+                 */
                 if (!motor->mode.enable_position
-                    && !motor->control.speed_startup_failed
-                    && fabsf(motor->control.speed_target)
-                        >= MOTOR_SPEED_TARGET_DEADBAND_RAD_S
-                    && fabsf(motor->velocity) < MOTOR_SPEED_START_THRESHOLD_RAD_S)
+                    && motor->control.speed_startup_tick == 0
+                    && fabsf(motor->velocity) < MOTOR_SPEED_START_EXIT_RAD_S)
                 {
-                    if (!motor->control.speed_startup_boost_active)
-                    {
-                        motor->control.speed_startup_tick = now;
-                        motor->control.speed_startup_boost_active = 1u;
-                    }
+                    motor->control.speed_startup_tick = now;
+                    motor->control.speed_startup_boost_active = 1u;
+                }
 
-                    if ((now - motor->control.speed_startup_tick)
-                        < pdMS_TO_TICKS(MOTOR_SPEED_START_MAX_MS))
+                if (motor->control.speed_startup_boost_active)
+                {
+                    /* 速度达到破除静摩擦阈值后立即交还给正常速度 PI。 */
+                    if (fabsf(motor->velocity) >= MOTOR_SPEED_START_EXIT_RAD_S)
+                    {
+                        motor->control.speed_startup_boost_active = 0u;
+                    }
+                    else if ((now - motor->control.speed_startup_tick)
+                             >= pdMS_TO_TICKS(MOTOR_SPEED_START_MAX_MS))
+                    {
+                        motor->control.speed_startup_boost_active = 0u;
+                        motor->control.speed_startup_failed = 1u;
+                    }
+                    else
                     {
                         motor->control.iq_current_target =
                             (motor->control.speed_target > 0.0f)
                             ? MOTOR_SPEED_START_IQ_A : -MOTOR_SPEED_START_IQ_A;
                     }
-                    else
-                    {
-                        motor->control.speed_startup_boost_active = 0u;
-                        motor->control.speed_startup_failed = 1u;
-                    }
-                }
-                else if (!motor->mode.enable_position)
-                {
-                    motor->control.speed_startup_boost_active = 0u;
                 }
             }
         }
