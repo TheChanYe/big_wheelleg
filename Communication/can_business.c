@@ -207,15 +207,6 @@ int can_business_process_frame(uint16_t id, const uint8_t *data, uint8_t len)
         return E_OK;
     }
 
-    if (g_motor_mode != CAN_MOTOR_MODE_SPEED
-        || get_u16_le(&data[4]) != g_speed_cmd.sequence)
-    {
-        if (g_motor1.control.speed_startup_failed)
-            Motor_Reset_Speed_Controller(&g_motor1);
-        if (g_motor2.control.speed_startup_failed)
-            Motor_Reset_Speed_Controller(&g_motor2);
-    }
-
     g_speed_cmd.motor0_speed_raw = get_i16_le(&data[0]);
     g_speed_cmd.motor1_speed_raw = get_i16_le(&data[2]);
     g_speed_cmd.sequence = get_u16_le(&data[4]);
@@ -292,7 +283,7 @@ static void send_speed_diag(uint16_t id, Motor_Data *motor)
     data[4] = (uint8_t)(vq_raw & 0xFF);
     data[5] = (uint8_t)((vq_raw >> 8) & 0xFF);
     data[6] = Motor_Is_Speed_Startup_Boost_Active(motor) ? 0x01u : 0x00u;
-    data[7] = 0x00u;
+    data[7] = motor->control.speed_startup_failed ? 0x01u : 0x00u;
 
     if (my_can_send_std(id, data, CAN_CMD_DLC) != E_OK)
         g_can_telemetry_tx_fail++;

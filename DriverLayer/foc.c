@@ -1,9 +1,12 @@
 #include "foc.h"
 
 #define MOTOR_SPEED_IQ_LIMIT_A                 0.30f
-#define MOTOR_SPEED_START_EXIT_RAD_S           0.20f
 #define MOTOR_SPEED_START_IQ_A                 0.60f
+#define MOTOR_SPEED_START_MIN_MS                40u
+#define MOTOR_SPEED_START_CONFIRM_RAD_S        0.50f
+#define MOTOR_SPEED_START_CONFIRM_MS           20u
 #define MOTOR_SPEED_START_MAX_MS                400u
+#define MOTOR_SPEED_START_HANDOFF_IQ_A         0.18f
 #define MOTOR_SPEED_TARGET_DEADBAND_RAD_S      0.10f
 #define MODULE_NAME  "foc"
 #ifdef  MODE_LOG_TAG
@@ -41,7 +44,7 @@ static const PID_Params velocity_params = {
     .output_max = MOTOR_SPEED_IQ_LIMIT_A
 #else
     .kp = 0.02f,
-    .ki = 0.05f,
+    .ki = 0.005f,
     .kd = 0.0f,
     .integral_max = MOTOR_SPEED_IQ_LIMIT_A,
     .output_max = MOTOR_SPEED_IQ_LIMIT_A
@@ -365,6 +368,7 @@ int Motor_Reset_Speed_Controller(Motor_Data *motor)
     motor->control.iq_current_target = 0.0f;
     motor->control.speed_startup_boost_active = 0u;
     motor->control.speed_startup_tick = 0;
+    motor->control.speed_startup_confirm_tick = 0;
     motor->control.speed_startup_failed = 0u;
     return E_OK;
 }
@@ -687,6 +691,7 @@ static int Motor_Control_Init(Motor_Data* motor)
 	motor->control.iq_current_target = 0.0f;
 	motor->control.speed_startup_boost_active = 0u;
 	motor->control.speed_startup_tick = 0;
+	motor->control.speed_startup_confirm_tick = 0;
 	motor->control.speed_startup_failed = 0u;
 	return E_OK;	
 }
@@ -813,37 +818,67 @@ int CascadeControl_Run(Motor_Data* motor, Motor_Mode mode, float target)
                 PID_Calc(&motor->speed_pid, motor->control.speed_target,
                          motor->velocity, &motor->control.iq_current_target);
 
-                /*
-                 * 每次非零速度运动只允许一次启动补偿。
-                 * speed_startup_tick 非零表示本次运动已尝试，必须等待目标回零才会解锁。
-                 */
+                /* 每次非零速度运动只允许一次启动补偿，确认失败也不重新尝试。 */
                 if (!motor->mode.enable_position
                     && motor->control.speed_startup_tick == 0
-                    && fabsf(motor->velocity) < MOTOR_SPEED_START_EXIT_RAD_S)
+                    && !motor->control.speed_startup_failed)
                 {
                     motor->control.speed_startup_tick = now;
+                    motor->control.speed_startup_confirm_tick = 0;
                     motor->control.speed_startup_boost_active = 1u;
                 }
 
                 if (motor->control.speed_startup_boost_active)
                 {
-                    /* 速度达到破除静摩擦阈值后立即交还给正常速度 PI。 */
-                    if (fabsf(motor->velocity) >= MOTOR_SPEED_START_EXIT_RAD_S)
-                    {
-                        motor->control.speed_startup_boost_active = 0u;
-                    }
-                    else if ((now - motor->control.speed_startup_tick)
-                             >= pdMS_TO_TICKS(MOTOR_SPEED_START_MAX_MS))
+                    if ((now - motor->control.speed_startup_tick)
+                        >= pdMS_TO_TICKS(MOTOR_SPEED_START_MAX_MS))
                     {
                         motor->control.speed_startup_boost_active = 0u;
                         motor->control.speed_startup_failed = 1u;
+                        motor->control.iq_current_target = 0.0f;
                     }
                     else
                     {
-                        motor->control.iq_current_target =
-                            (motor->control.speed_target > 0.0f)
-                            ? MOTOR_SPEED_START_IQ_A : -MOTOR_SPEED_START_IQ_A;
+                        if ((now - motor->control.speed_startup_tick)
+                            >= pdMS_TO_TICKS(MOTOR_SPEED_START_MIN_MS)
+                            && motor->control.speed_target * motor->velocity > 0.0f
+                            && fabsf(motor->velocity)
+                                >= MOTOR_SPEED_START_CONFIRM_RAD_S)
+                        {
+                            if (motor->control.speed_startup_confirm_tick == 0)
+                                motor->control.speed_startup_confirm_tick = now;
+                            else if ((now - motor->control.speed_startup_confirm_tick)
+                                     >= pdMS_TO_TICKS(MOTOR_SPEED_START_CONFIRM_MS))
+                            {
+                                /* 连续运动确认后以较小积分值平滑交还给速度 PI。 */
+                                motor->control.speed_startup_boost_active = 0u;
+                                motor->speed_pid.integral =
+                                    (motor->control.speed_target > 0.0f)
+                                    ? MOTOR_SPEED_START_HANDOFF_IQ_A
+                                    : -MOTOR_SPEED_START_HANDOFF_IQ_A;
+                                motor->speed_pid.prev_error =
+                                    motor->control.speed_target - motor->velocity;
+                            }
+                        }
+                        else
+                        {
+                            /* 速度跌落或反向时重新开始连续确认，不重新执行 startup。 */
+                            motor->control.speed_startup_confirm_tick = 0;
+                        }
+
+                        if (motor->control.speed_startup_boost_active)
+                        {
+                            motor->control.iq_current_target =
+                                (motor->control.speed_target > 0.0f)
+                                ? MOTOR_SPEED_START_IQ_A : -MOTOR_SPEED_START_IQ_A;
+                        }
                     }
+                }
+                else if (!motor->mode.enable_position
+                         && motor->control.speed_startup_failed)
+                {
+                    /* 启动超时后本次非零命令保持零扭矩，等待真正停车命令解锁。 */
+                    motor->control.iq_current_target = 0.0f;
                 }
             }
         }
