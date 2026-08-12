@@ -23,6 +23,7 @@ static volatile float    g_motor1_iq_output = 0.0f;
 static CanMotorMode      g_motor_mode = CAN_MOTOR_MODE_CURRENT;
 static TickType_t        g_last_cmd_tick = 0;
 static uint8_t           g_cmd_active = 0;
+static volatile uint32_t g_can_telemetry_tx_fail = 0u;
 
 static inline float clamp_f(float val, float lo, float hi)
 {
@@ -192,7 +193,8 @@ static void send_speed_state(uint16_t id, Motor_Data *motor, float target)
     data[7] = (g_cmd_active ? 0x01u : 0x00u)
             | (g_motor_mode == CAN_MOTOR_MODE_SPEED ? 0x02u : 0x00u);
 
-    my_can_send_std(id, data, CAN_CMD_DLC);
+    if (my_can_send_std(id, data, CAN_CMD_DLC) != E_OK)
+        g_can_telemetry_tx_fail++;
 }
 
 static void send_speed_diag(uint16_t id, Motor_Data *motor)
@@ -211,7 +213,8 @@ static void send_speed_diag(uint16_t id, Motor_Data *motor)
     data[6] = Motor_Is_Speed_Startup_Boost_Active(motor) ? 0x01u : 0x00u;
     data[7] = 0x00u;
 
-    my_can_send_std(id, data, CAN_CMD_DLC);
+    if (my_can_send_std(id, data, CAN_CMD_DLC) != E_OK)
+        g_can_telemetry_tx_fail++;
 }
 
 void can_business_send_motor0_speed_state(void)

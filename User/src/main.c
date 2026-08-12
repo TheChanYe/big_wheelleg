@@ -270,6 +270,7 @@ void can_business_task(void *pvParameters) {
     uint8_t     len;
     int         ret;
     TickType_t  last_state_tick = 0;
+    uint8_t     diag_pending = 0u;
 
     /* CAN init once from business task */
     ret = my_can_init();
@@ -292,15 +293,26 @@ void can_business_task(void *pvParameters) {
         /* safety: zero outputs on command timeout */
         can_business_tick();
 
-        /* MOTOR0/MOTOR1 speed telemetry @ 50 Hz (20 ms) */
-        if ((xTaskGetTickCount() - last_state_tick)
+        TickType_t now = xTaskGetTickCount();
+
+        /* State telemetry @ 50 Hz (20 ms). */
+        if ((now - last_state_tick)
             >= pdMS_TO_TICKS(20))
         {
-            last_state_tick = xTaskGetTickCount();
+            last_state_tick = now;
             can_business_send_motor0_speed_state();
-            can_business_send_motor0_speed_diag();
             can_business_send_motor1_speed_state();
+
+            diag_pending = 1u;
+        }
+
+        /* Diagnostics @ 50 Hz, staggered from state telemetry by >= 1 ms. */
+        if (diag_pending
+            && (now - last_state_tick) >= pdMS_TO_TICKS(1))
+        {
+            can_business_send_motor0_speed_diag();
             can_business_send_motor1_speed_diag();
+            diag_pending = 0u;
         }
 
         vTaskDelay(pdMS_TO_TICKS(1));   /* 1ms poll interval */
