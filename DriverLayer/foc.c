@@ -9,12 +9,11 @@
 #define MOTOR_SPEED_START_CONFIRM_MS           20u
 #define MOTOR_SPEED_START_MAX_MS                400u
 #define MOTOR_SPEED_TARGET_DEADBAND_RAD_S      0.10f
-#define MOTOR_SPEED_LOW_REGION_RAD_S            4.0f
+#define MOTOR_SPEED_LOW_REGION_RAD_S            4.5f
 #define MOTOR_SPEED_FRICTION_IQ_A              0.18f
-#define MOTOR_SPEED_COAST_MARGIN_RAD_S         0.20f
-#define MOTOR_SPEED_LOW_KP                     0.02f
+#define MOTOR_SPEED_LOW_KP                     0.04f
 #define MOTOR_SPEED_LOW_KI_PER_S               0.20f
-#define MOTOR_SPEED_LOW_I_LIMIT_A              0.18f
+#define MOTOR_SPEED_LOW_I_LIMIT_A              0.12f
 #define MODULE_NAME  "foc"
 #ifdef  MODE_LOG_TAG
 #undef  MODE_LOG_TAG
@@ -136,49 +135,35 @@ static float Motor_LowSpeed_Control(Motor_Data *motor, float target,
                                     float feedback, float dt_s)
 {
     float direction = (target > 0.0f) ? 1.0f : -1.0f;
-    float speed_direction = feedback * direction;
-    float overspeed = speed_direction - fabsf(target);
-    float ff_scale = 1.0f;
-    float friction_ff;
-    float p_term;
-    float iq_unclamped;
-    float iq_clamped;
+    float target_dir = fabsf(target);
+    float speed_dir = feedback * direction;
+    float error_dir = target_dir - speed_dir;
+    float p_term_dir = MOTOR_SPEED_LOW_KP * error_dir;
+    float integral_old = clamp_f(motor->speed_pid.integral * direction,
+                                 0.0f, MOTOR_SPEED_LOW_I_LIMIT_A);
+    float integral_new = clamp_f(integral_old + error_dir
+                                 * MOTOR_SPEED_LOW_KI_PER_S * dt_s,
+                                 0.0f, MOTOR_SPEED_LOW_I_LIMIT_A);
+    float iq_test = MOTOR_SPEED_FRICTION_IQ_A + p_term_dir + integral_new;
+    float iq_dir;
+    float iq_output;
 
-    if (overspeed >= MOTOR_SPEED_COAST_MARGIN_RAD_S)
+    /* 输出已饱和且误差继续推动积分时，保持上一积分值。 */
+    if ((iq_test > MOTOR_SPEED_IQ_LIMIT_A && error_dir > 0.0f)
+        || (iq_test < 0.0f && error_dir < 0.0f))
     {
-        /* 明显超速时仅滑行，禁止通过反向 Iq 主动制动。 */
-        PID_Reset(&motor->speed_pid);
-        return 0.0f;
+        integral_new = integral_old;
     }
 
-    if (overspeed > 0.0f)
-        ff_scale = clamp_f(1.0f - overspeed / MOTOR_SPEED_COAST_MARGIN_RAD_S,
-                           0.0f, 1.0f);
+    iq_dir = clamp_f(MOTOR_SPEED_FRICTION_IQ_A + p_term_dir + integral_new,
+                     0.0f, MOTOR_SPEED_IQ_LIMIT_A);
+    iq_output = iq_dir * direction;
 
-    friction_ff = direction * MOTOR_SPEED_FRICTION_IQ_A * ff_scale;
-    p_term = MOTOR_SPEED_LOW_KP * (target - feedback);
-    motor->speed_pid.integral += (target - feedback)
-        * MOTOR_SPEED_LOW_KI_PER_S * dt_s;
-    motor->speed_pid.integral = clamp_f(motor->speed_pid.integral,
-                                        -MOTOR_SPEED_LOW_I_LIMIT_A,
-                                        MOTOR_SPEED_LOW_I_LIMIT_A);
-
-    iq_unclamped = friction_ff + p_term + motor->speed_pid.integral;
-    iq_clamped = clamp_f(iq_unclamped * direction, 0.0f,
-                         MOTOR_SPEED_IQ_LIMIT_A) * direction;
-
-    if (iq_clamped != iq_unclamped)
-    {
-        /* 输出限幅时回算积分，防止低速区积分继续向限幅方向累积。 */
-        motor->speed_pid.integral = clamp_f(iq_clamped - friction_ff - p_term,
-                                            -MOTOR_SPEED_LOW_I_LIMIT_A,
-                                            MOTOR_SPEED_LOW_I_LIMIT_A);
-    }
-
+    motor->speed_pid.integral = integral_new * direction;
     motor->speed_pid.prev_error = target - feedback;
     motor->speed_pid.error = target - feedback;
-    motor->speed_pid.output = iq_clamped;
-    return iq_clamped;
+    motor->speed_pid.output = iq_output;
+    return iq_output;
 }
 
 
@@ -839,6 +824,14 @@ int CascadeControl_Run(Motor_Data* motor, Motor_Mode mode, float target)
 	}
 	else if(mode==Speed_loop)
 	{
+		float old_target = motor->control.speed_target;
+		if (fabsf(old_target) >= MOTOR_SPEED_TARGET_DEADBAND_RAD_S
+			&& fabsf(target) >= MOTOR_SPEED_TARGET_DEADBAND_RAD_S
+			&& old_target * target < 0.0f)
+		{
+			/* 直接反转视为新的运动周期，避免复用上一方向的启动锁存和积分。 */
+			Motor_Reset_Speed_Controller(motor);
+		}
 		motor->mode.enable_position = false;
 		motor->mode.enable_speed = true;
 		motor->mode.enable_current = true;
