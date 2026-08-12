@@ -52,7 +52,7 @@ static void reset_controllers(void)
 {
     Motor_Reset_Current_Controller(&g_motor1);
     Motor_Reset_Current_Controller(&g_motor2);
-    PID_Reset(&g_motor1.speed_pid);
+    Motor_Reset_Speed_Controller(&g_motor1);
 }
 
 static void disable_command(void)
@@ -128,6 +128,13 @@ int can_business_process_frame(uint16_t id, const uint8_t *data, uint8_t len)
 
         send_ack(&g_wheel_cmd);
         return E_OK;
+    }
+
+    if (g_motor1.control.speed_startup_failed
+        && (g_motor_mode != CAN_MOTOR_MODE_SPEED
+            || get_u16_le(&data[4]) != g_speed_cmd.sequence))
+    {
+        Motor_Reset_Speed_Controller(&g_motor1);
     }
 
     g_speed_cmd.motor0_speed_raw = get_i16_le(&data[0]);

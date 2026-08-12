@@ -186,6 +186,8 @@ typedef struct {
     float speed_feedback;
     float position_feedback;
     uint8_t speed_startup_boost_active;
+    TickType_t speed_startup_tick;
+    uint8_t speed_startup_failed;
 } MotorControl;
 
 /*电机参数结构体*/

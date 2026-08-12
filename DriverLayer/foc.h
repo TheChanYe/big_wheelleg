@@ -16,6 +16,7 @@ int Open_Motor(Motor_Data* motor);
 int Get_Mos_Temp(Motor_Data* motor);
 int Motor_Update_Speed(Motor_Data *motor);
 int Motor_Reset_Current_Controller(Motor_Data *motor);
+int Motor_Reset_Speed_Controller(Motor_Data *motor);
 uint8_t Motor_Is_Speed_Startup_Boost_Active(const Motor_Data *motor);
 ///*获取电机速度*/
 //float GetMotorPreSpeed(void);

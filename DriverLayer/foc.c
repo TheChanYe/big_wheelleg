@@ -1,8 +1,9 @@
 #include "foc.h"
 
 #define MOTOR_SPEED_IQ_LIMIT_A                 0.30f
-#define MOTOR_SPEED_START_THRESHOLD_RAD_S      0.5f
-#define MOTOR_SPEED_START_IQ_A                 0.30f
+#define MOTOR_SPEED_START_THRESHOLD_RAD_S      1.0f
+#define MOTOR_SPEED_START_IQ_A                 0.50f
+#define MOTOR_SPEED_START_MAX_MS                500u
 #define MOTOR_SPEED_TARGET_DEADBAND_RAD_S      0.10f
 #define MODULE_NAME  "foc"
 #ifdef  MODE_LOG_TAG
@@ -353,6 +354,20 @@ int Motor_Reset_Current_Controller(Motor_Data *motor)
     motor->control.speed_startup_boost_active = 0u;
     return E_OK;
 }
+
+int Motor_Reset_Speed_Controller(Motor_Data *motor)
+{
+    if (motor == NULL)
+        return E_PARAM;
+
+    PID_Reset(&motor->speed_pid);
+    motor->control.speed_target = 0.0f;
+    motor->control.iq_current_target = 0.0f;
+    motor->control.speed_startup_boost_active = 0u;
+    motor->control.speed_startup_tick = 0;
+    motor->control.speed_startup_failed = 0u;
+    return E_OK;
+}
 /*电机参数初始化*/
 int Motor_Init(Motor_Type motor)
 {
@@ -671,6 +686,8 @@ static int Motor_Control_Init(Motor_Data* motor)
 	motor->control.id_current_target = 0.0f;
 	motor->control.iq_current_target = 0.0f;
 	motor->control.speed_startup_boost_active = 0u;
+	motor->control.speed_startup_tick = 0;
+	motor->control.speed_startup_failed = 0u;
 	return E_OK;	
 }
 
@@ -702,6 +719,7 @@ int CascadeControl_Run(Motor_Data* motor, Motor_Mode mode, float target)
 	}
 	else if(mode==Current_loop)
 	{
+		Motor_Reset_Speed_Controller(motor);
 		motor->mode.enable_position = false;
 		motor->mode.enable_speed = false;
 		motor->mode.enable_current = true;
@@ -784,34 +802,62 @@ int CascadeControl_Run(Motor_Data* motor, Motor_Mode mode, float target)
         if ((now - motor->control.speed_last_tick) >= pdMS_TO_TICKS(SPEED_INTERVAL))
         {
             motor->control.speed_last_tick = now;
-            motor->control.speed_startup_boost_active = 0u;
-
             if (!motor->mode.enable_position
                 && fabsf(motor->control.speed_target) < MOTOR_SPEED_TARGET_DEADBAND_RAD_S)
             {
-                motor->control.speed_target = 0.0f;
+
+                Motor_Reset_Speed_Controller(motor);
+            }
+            else if (motor == &g_motor1
+                     && !motor->mode.enable_position
+                     && motor->control.speed_startup_failed)
+            {
                 motor->control.iq_current_target = 0.0f;
-                PID_Reset(&motor->speed_pid);
             }
             else
             {
                 PID_Calc(&motor->speed_pid, motor->control.speed_target,
                          motor->velocity, &motor->control.iq_current_target);
 
-                if (!motor->mode.enable_position
+                if (motor == &g_motor1
+                    && !motor->mode.enable_position
+                    && !motor->control.speed_startup_failed
+                    && fabsf(motor->control.speed_target)
+                        >= MOTOR_SPEED_TARGET_DEADBAND_RAD_S
                     && fabsf(motor->velocity) < MOTOR_SPEED_START_THRESHOLD_RAD_S)
                 {
-                    motor->control.iq_current_target =
-                        (motor->control.speed_target > 0.0f)
-                        ? MOTOR_SPEED_START_IQ_A : -MOTOR_SPEED_START_IQ_A;
-                    motor->control.speed_startup_boost_active = 1u;
+                    if (!motor->control.speed_startup_boost_active)
+                    {
+                        motor->control.speed_startup_tick = now;
+                        motor->control.speed_startup_boost_active = 1u;
+                    }
+
+                    if ((now - motor->control.speed_startup_tick)
+                        < pdMS_TO_TICKS(MOTOR_SPEED_START_MAX_MS))
+                    {
+                        motor->control.iq_current_target =
+                            (motor->control.speed_target > 0.0f)
+                            ? MOTOR_SPEED_START_IQ_A : -MOTOR_SPEED_START_IQ_A;
+                    }
+                    else
+                    {
+                        motor->control.iq_current_target = 0.0f;
+                        motor->control.speed_startup_boost_active = 0u;
+                        motor->control.speed_startup_failed = 1u;
+                        PID_Reset(&motor->speed_pid);
+                    }
+                }
+                else if (motor == &g_motor1
+                         && fabsf(motor->velocity) >= MOTOR_SPEED_START_THRESHOLD_RAD_S)
+                {
+                    motor->control.speed_startup_boost_active = 0u;
                 }
             }
         }
     }
     else
     {
-        motor->control.speed_startup_boost_active = 0u;
+        Motor_Reset_Speed_Controller(motor);
     }
 
     /*====== 电流环计算 ======*/
