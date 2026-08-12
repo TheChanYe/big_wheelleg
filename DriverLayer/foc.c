@@ -5,12 +5,17 @@
 #define MOTOR_SPEED_START_STAGE1_MS             200u
 #define MOTOR_SPEED_START_IQ_STAGE2_A          0.75f
 #define MOTOR_SPEED_START_MIN_MS                40u
-#define MOTOR_SPEED_START_CONFIRM_RAD_S        0.50f
+#define MOTOR_SPEED_START_CONFIRM_RATIO         0.50f
+#define MOTOR_SPEED_START_CONFIRM_MIN_RAD_S     0.50f
+#define MOTOR_SPEED_START_CONFIRM_MAX_RAD_S     2.00f
 #define MOTOR_SPEED_START_CONFIRM_MS           20u
 #define MOTOR_SPEED_START_MAX_MS                400u
 #define MOTOR_SPEED_TARGET_DEADBAND_RAD_S      0.10f
 #define MOTOR_SPEED_LOW_REGION_RAD_S            4.5f
-#define MOTOR_SPEED_FRICTION_IQ_A              0.18f
+#define MOTOR_SPEED_VERY_LOW_REGION_RAD_S       2.50f
+#define MOTOR_SPEED_FRICTION_IQ_A              0.16f
+#define MOTOR_SPEED_STICTION_IQ_A              0.29f
+#define MOTOR_SPEED_VERY_LOW_IQ_LIMIT_A        0.45f
 #define MOTOR_SPEED_LOW_KP                     0.04f
 #define MOTOR_SPEED_LOW_KI_PER_S               0.20f
 #define MOTOR_SPEED_LOW_I_LIMIT_A              0.12f
@@ -74,11 +79,19 @@ static float clamp_f(float value, float min_value, float max_value)
     return value;
 }
 
+static float Motor_Speed_Get_Startup_Confirm(float target)
+{
+    return clamp_f(fabsf(target) * MOTOR_SPEED_START_CONFIRM_RATIO,
+                   MOTOR_SPEED_START_CONFIRM_MIN_RAD_S,
+                   MOTOR_SPEED_START_CONFIRM_MAX_RAD_S);
+}
+
 static void Motor_Speed_Startup_Run(Motor_Data *motor, TickType_t now)
 {
     TickType_t elapsed;
     float target = motor->control.speed_target;
     float direction = (target > 0.0f) ? 1.0f : -1.0f;
+    float confirm_speed = Motor_Speed_Get_Startup_Confirm(target);
     float startup_iq;
 
     if (motor->control.speed_startup_tick == 0)
@@ -103,7 +116,7 @@ static void Motor_Speed_Startup_Run(Motor_Data *motor, TickType_t now)
 
     if (elapsed >= pdMS_TO_TICKS(MOTOR_SPEED_START_MIN_MS)
         && target * motor->velocity > 0.0f
-        && fabsf(motor->velocity) >= MOTOR_SPEED_START_CONFIRM_RAD_S)
+        && fabsf(motor->velocity) >= confirm_speed)
     {
         if (motor->control.speed_startup_confirm_tick == 0)
         {
@@ -138,25 +151,38 @@ static float Motor_LowSpeed_Control(Motor_Data *motor, float target,
     float target_dir = fabsf(target);
     float speed_dir = feedback * direction;
     float error_dir = target_dir - speed_dir;
+    float iq_limit = (target_dir <= MOTOR_SPEED_VERY_LOW_REGION_RAD_S)
+        ? MOTOR_SPEED_VERY_LOW_IQ_LIMIT_A : MOTOR_SPEED_IQ_LIMIT_A;
+    float stiction = 0.0f;
     float p_term_dir = MOTOR_SPEED_LOW_KP * error_dir;
     float integral_old = clamp_f(motor->speed_pid.integral * direction,
                                  0.0f, MOTOR_SPEED_LOW_I_LIMIT_A);
     float integral_new = clamp_f(integral_old + error_dir
                                  * MOTOR_SPEED_LOW_KI_PER_S * dt_s,
                                  0.0f, MOTOR_SPEED_LOW_I_LIMIT_A);
-    float iq_test = MOTOR_SPEED_FRICTION_IQ_A + p_term_dir + integral_new;
+    float iq_test;
     float iq_dir;
     float iq_output;
 
+    if (target_dir <= MOTOR_SPEED_VERY_LOW_REGION_RAD_S && error_dir > 0.0f)
+    {
+        float denominator = (target_dir > MOTOR_SPEED_TARGET_DEADBAND_RAD_S)
+            ? target_dir : MOTOR_SPEED_TARGET_DEADBAND_RAD_S;
+        float underspeed_ratio = clamp_f(error_dir / denominator, 0.0f, 1.0f);
+        stiction = MOTOR_SPEED_STICTION_IQ_A * underspeed_ratio;
+    }
+
+    iq_test = MOTOR_SPEED_FRICTION_IQ_A + stiction + p_term_dir + integral_new;
+
     /* 输出已饱和且误差继续推动积分时，保持上一积分值。 */
-    if ((iq_test > MOTOR_SPEED_IQ_LIMIT_A && error_dir > 0.0f)
+    if ((iq_test > iq_limit && error_dir > 0.0f)
         || (iq_test < 0.0f && error_dir < 0.0f))
     {
         integral_new = integral_old;
     }
 
-    iq_dir = clamp_f(MOTOR_SPEED_FRICTION_IQ_A + p_term_dir + integral_new,
-                     0.0f, MOTOR_SPEED_IQ_LIMIT_A);
+    iq_dir = clamp_f(MOTOR_SPEED_FRICTION_IQ_A + stiction + p_term_dir
+                     + integral_new, 0.0f, iq_limit);
     iq_output = iq_dir * direction;
 
     motor->speed_pid.integral = integral_new * direction;
