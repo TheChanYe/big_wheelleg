@@ -845,8 +845,12 @@ int CascadeControl_Run(Motor_Data* motor, Motor_Mode mode, float target)
             }
         }
     }
-    else
+    else if(mode != Current_loop)
     {
+        /*
+         * Current Mode 已在进入控制模式时复位过速度控制器。
+         * 此处禁止再次复位，否则会把刚写入的 Iq 目标清零。
+         */
         Motor_Reset_Speed_Controller(motor);
     }
 

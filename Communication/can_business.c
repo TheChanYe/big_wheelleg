@@ -118,6 +118,12 @@ static int16_t to_i16_sat(float val)
     return (int16_t)val;
 }
 
+static uint16_t get_active_sequence(void)
+{
+    return (g_motor_mode == CAN_MOTOR_MODE_SPEED)
+        ? g_speed_cmd.sequence : g_wheel_cmd.sequence;
+}
+
 static void reset_controllers(void)
 {
     Motor_Reset_Current_Controller(&g_motor1);
@@ -249,15 +255,21 @@ void can_business_tick(void)
 static void send_speed_state(uint16_t id, Motor_Data *motor, float target)
 {
     uint8_t data[8];
-    int16_t cmd_raw = to_i16_sat(target * 10.0f);
+    float state_target = (g_motor_mode == CAN_MOTOR_MODE_SPEED) ? target : 0.0f;
+    uint16_t sequence = get_active_sequence();
+    int16_t cmd_raw = to_i16_sat(state_target * 10.0f);
     int16_t measured_raw = to_i16_sat(motor->velocity * 10.0f);
 
     data[0] = (uint8_t)(cmd_raw & 0xFF);
     data[1] = (uint8_t)((cmd_raw >> 8) & 0xFF);
     data[2] = (uint8_t)(measured_raw & 0xFF);
     data[3] = (uint8_t)((measured_raw >> 8) & 0xFF);
-    data[4] = (uint8_t)(g_speed_cmd.sequence & 0xFF);
-    data[5] = (uint8_t)((g_speed_cmd.sequence >> 8) & 0xFF);
+    /*
+     * 状态帧 sequence 必须对应当前控制模式。
+     * Current Mode 使用 0x101，Speed Mode 使用 0x102 的 sequence。
+     */
+    data[4] = (uint8_t)(sequence & 0xFF);
+    data[5] = (uint8_t)((sequence >> 8) & 0xFF);
     data[6] = motor->run_state;
     data[7] = (g_cmd_active ? 0x01u : 0x00u)
             | (g_motor_mode == CAN_MOTOR_MODE_SPEED ? 0x02u : 0x00u);
