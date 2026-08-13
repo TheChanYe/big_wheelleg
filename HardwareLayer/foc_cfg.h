@@ -68,6 +68,7 @@
 /************************ADC配置参数***************/
 #define G 80.0f                   //电流放大器增益80v/v
 #define Sampling_resistor 0.01f   //采样电阻10mR
+#define MOTOR_PHASE_CURRENT_FAULT_A 3.8f /* 3.3V ADC 满量程约 4.125A。 */
 
 /******************* FOC算法数据结构体****************/
 

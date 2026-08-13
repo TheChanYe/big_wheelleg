@@ -12,6 +12,46 @@
 #include "system_monitor.h"
 #include "drv_fault.h"
 
+#define WATCHDOG_MOTOR0_ALIVE  0x01u
+#define WATCHDOG_MOTOR1_ALIVE  0x02u
+#define WATCHDOG_CAN_ALIVE     0x04u
+#define WATCHDOG_STATUS_ALIVE  0x08u
+#define WATCHDOG_REQUIRED      (WATCHDOG_MOTOR0_ALIVE | WATCHDOG_MOTOR1_ALIVE \
+                                | WATCHDOG_CAN_ALIVE | WATCHDOG_STATUS_ALIVE)
+
+static volatile uint8_t g_watchdog_ready = 0u;
+static volatile uint8_t g_watchdog_alive = 0u;
+static uint8_t g_watchdog_enabled = 0u;
+
+static void Watchdog_MarkAlive(uint8_t bit, uint8_t ready)
+{
+    if (ready)
+        g_watchdog_ready |= bit;
+    g_watchdog_alive |= bit;
+}
+
+static void Watchdog_Process(void)
+{
+    if (!g_watchdog_enabled)
+    {
+        if (g_watchdog_ready != WATCHDOG_REQUIRED)
+            return;
+
+        wdt_register_write_enable(TRUE);
+        wdt_divider_set(WDT_CLK_DIV_256);
+        wdt_reload_value_set(625u); /* LICK 40kHz 下约 4 秒。 */
+        while (wdt_flag_get(WDT_DIVF_UPDATE_FLAG | WDT_RLDF_UPDATE_FLAG));
+        wdt_enable();
+        g_watchdog_enabled = 1u;
+    }
+
+    if ((g_watchdog_alive & WATCHDOG_REQUIRED) == WATCHDOG_REQUIRED)
+    {
+        wdt_counter_reload();
+        g_watchdog_alive = 0u;
+    }
+}
+
 TaskHandle_t g_motor0_task_handle = NULL;
 TaskHandle_t g_motor1_task_handle = NULL;
 static TaskHandle_t g_uart_task_handle = NULL;
@@ -29,6 +69,8 @@ static void MotorTask(void *argument)
         log_error("Motor Init Faild!");
         vTaskDelete(NULL);
     }
+    Watchdog_MarkAlive((motor_id == 0u) ? WATCHDOG_MOTOR0_ALIVE
+                                        : WATCHDOG_MOTOR1_ALIVE, 1u);
 
     while (1)
     {
@@ -38,6 +80,8 @@ static void MotorTask(void *argument)
         notifications = ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
         MotorService_RecordControlCycle(motor_id, notifications);
         MotorService_Run(motor_id);
+        Watchdog_MarkAlive((motor_id == 0u) ? WATCHDOG_MOTOR0_ALIVE
+                                            : WATCHDOG_MOTOR1_ALIVE, 0u);
     }
 }
 
@@ -49,10 +93,12 @@ static void CanBusinessTask(void *argument)
         log_error("CAN business: my_can_init failed");
         vTaskDelete(NULL);
     }
+    Watchdog_MarkAlive(WATCHDOG_CAN_ALIVE, 1u);
     while (1)
     {
         can_business_process();
         DrvFault_Process();
+        Watchdog_MarkAlive(WATCHDOG_CAN_ALIVE, 0u);
         vTaskDelay(pdMS_TO_TICKS(1));
     }
 }
@@ -98,6 +144,8 @@ static void StatusTask(void *argument)
     while (1)
     {
         SystemMonitor_Process();
+        Watchdog_MarkAlive(WATCHDOG_STATUS_ALIVE, 1u);
+        Watchdog_Process();
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }

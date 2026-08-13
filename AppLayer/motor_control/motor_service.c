@@ -10,6 +10,7 @@
 #include "safety_limit.h"
 #include "motor_fault.h"
 #include "drv_fault.h"
+#include <math.h>
 
 /* 历史命名保持不变：g_motor1=物理 Motor0/左轮/TMR1，g_motor2=物理 Motor1/右轮/TMR8。 */
 Motor_Data g_motor1 = {0};
@@ -26,6 +27,20 @@ static float MotorService_CommandDirection(uint8_t motor_id)
 {
     return (motor_id == 0u) ? MOTOR0_COMMAND_DIRECTION
                             : MOTOR1_COMMAND_DIRECTION;
+}
+
+static uint8_t MotorService_CurrentInvalid(const Motor_Data *motor)
+{
+    if (!isfinite(motor->current_abc.Ia) || !isfinite(motor->current_abc.Ib)
+        || !isfinite(motor->current_abc.Ic)
+        || !isfinite(motor->control.iq_current_feedback))
+        return 1u;
+
+    return (fabsf(motor->current_abc.Ia) >= MOTOR_PHASE_CURRENT_FAULT_A
+        || fabsf(motor->current_abc.Ib) >= MOTOR_PHASE_CURRENT_FAULT_A
+        || fabsf(motor->current_abc.Ic) >= MOTOR_PHASE_CURRENT_FAULT_A
+        || fabsf(motor->control.iq_current_feedback)
+            >= MOTOR_PHASE_CURRENT_FAULT_A) ? 1u : 0u;
 }
 
 int MotorService_Init(uint8_t motor_id)
@@ -90,6 +105,9 @@ int MotorService_Run(uint8_t motor_id)
 
     if (ret != E_OK)
         MotorFault_Enter(motor_id, motor, CONTROL_FAULT);
+    else if (MotorService_CurrentInvalid(motor))
+        MotorFault_Enter(motor_id, motor, (motor_id == 0u)
+            ? MOTOR0_OVERCURRENT : MOTOR1_OVERCURRENT);
     return ret;
 }
 
