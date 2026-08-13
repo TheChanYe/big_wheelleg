@@ -109,6 +109,8 @@ virtualFolder:
         - path: ../HardwareLayer/my_flash.c
         - path: ../HardwareLayer/my_flash.h
         - path: ../HardwareLayer/my_can.c
+        - path: ../HardwareLayer/drv_fault.c
+        - path: ../HardwareLayer/drv_fault.h
       folders: []
     - name: DriverLayer
       files:
@@ -143,6 +145,13 @@ virtualFolder:
             - path: ../AppLayer/motor_control/motor_service.c
             - path: ../AppLayer/motor_control/motor_service.h
           folders: []
+    - name: Safety
+      files:
+        - path: ../Safety/motor_fault.c
+        - path: ../Safety/motor_fault.h
+        - path: ../Safety/safety_limit.c
+        - path: ../Safety/safety_limit.h
+      folders: []
     - name: Communication
       files:
         - path: ../Communication/can_business.c
@@ -173,6 +182,7 @@ targets:
         - ../DriverLayer
         - ../AlgorithmLayer
         - ../Communication
+        - ../Safety
         - .cmsis/include
         - RTE/_Target_1
         - ../User/inc

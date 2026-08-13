@@ -17,6 +17,10 @@
 #define MOTOR_SPEED_ESTIMATE_MS 5u
 #define MOTOR_SPEED_LPF_TF      0.010f
 
+/* 机器人统一坐标：正 Iq / 正速度为定义的前进方向。台架确认后只改此处。 */
+#define MOTOR0_COMMAND_DIRECTION  1.0f
+#define MOTOR1_COMMAND_DIRECTION  1.0f
+
 /*****************定时器参数*******************************/
 #define TMR_CLOCK 240000000                                          // 定时器时钟频率 240MHz
 #define TMR_PWM 20000                                                // PWM频率 24kHz

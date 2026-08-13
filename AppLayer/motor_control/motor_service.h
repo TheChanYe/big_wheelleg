@@ -14,5 +14,9 @@ int MotorService_Init(uint8_t motor_id);
 
 /** 功能：执行指定电机一次原有控制循环；参数：物理电机号；返回值：控制结果。 */
 int MotorService_Run(uint8_t motor_id);
+int MotorService_ClearFault(uint8_t motor_id);
+void MotorService_RecordControlCycle(uint8_t motor_id, uint32_t notifications);
+uint32_t MotorService_GetControlCount(uint8_t motor_id);
+uint32_t MotorService_GetControlOverrunCount(uint8_t motor_id);
 
 #endif

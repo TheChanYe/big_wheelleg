@@ -10,6 +10,7 @@
 #include "can_business.h"
 #include "uart_business.h"
 #include "system_monitor.h"
+#include "drv_fault.h"
 
 TaskHandle_t g_motor0_task_handle = NULL;
 TaskHandle_t g_motor1_task_handle = NULL;
@@ -31,8 +32,11 @@ static void MotorTask(void *argument)
 
     while (1)
     {
+        uint32_t notifications;
+
         /* 控制环仍严格由 ADC 中断通知驱动。 */
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        notifications = ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        MotorService_RecordControlCycle(motor_id, notifications);
         MotorService_Run(motor_id);
     }
 }
@@ -48,6 +52,7 @@ static void CanBusinessTask(void *argument)
     while (1)
     {
         can_business_process();
+        DrvFault_Process();
         vTaskDelay(pdMS_TO_TICKS(1));
     }
 }

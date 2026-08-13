@@ -7,6 +7,8 @@ typedef enum __INTERRUPT_PRO
     DMA2_2_PRO    = 5,  // SPI3接收中断
     ADC_1_2_PRO   = 6,  // ADC采样中断
     ADC_3_PRO     = 6,  // ADC采样中断
+    DRV_FAULT_5_9_PRO   = 5,
+    DRV_FAULT_10_15_PRO = 5,
     DMA1_7_PRO    = 7,	//串口DMA中断
     USART2_PRO    = 8,  // 串口中断	
     EXTI_0_PRO    = 9,

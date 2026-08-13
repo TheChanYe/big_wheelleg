@@ -338,7 +338,7 @@
               <MiscControls>--locale=english</MiscControls>
               <Define>AT32F403ARGT7,USE_STDPERIPH_DRIVER,AT_START_F403A_V1,ARM_MATH_CM4,__TARGET_FPU_VFP,__FPU_PRESENT</Define>
               <Undefine></Undefine>
-              <IncludePath>..\libraries\cmsis\cm4\core_support;..\libraries\cmsis\cm4\device_support;..\libraries\drivers\inc;..\user\inc;..\freertos\source\include;..\freertos\source\portable\memmang;..\freertos\source\portable\rvds\ARM_CM4F;..\Libraries\cmsis\dsp\include;..\AppLayer\system;..\Tools;..\HardwareLayer;..\DriverLayer;..\AlgorithmLayer;..\Communication</IncludePath>
+              <IncludePath>..\libraries\cmsis\cm4\core_support;..\libraries\cmsis\cm4\device_support;..\libraries\drivers\inc;..\user\inc;..\freertos\source\include;..\freertos\source\portable\memmang;..\freertos\source\portable\rvds\ARM_CM4F;..\Libraries\cmsis\dsp\include;..\AppLayer\system;..\Tools;..\HardwareLayer;..\DriverLayer;..\AlgorithmLayer;..\Communication;..\Safety</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -841,6 +841,22 @@
           <Files>
             <File><FileName>motor_service.c</FileName><FileType>1</FileType><FilePath>..\AppLayer\motor_control\motor_service.c</FilePath></File>
             <File><FileName>motor_service.h</FileName><FileType>5</FileType><FilePath>..\AppLayer\motor_control\motor_service.h</FilePath></File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>Safety</GroupName>
+          <Files>
+            <File><FileName>motor_fault.c</FileName><FileType>1</FileType><FilePath>..\Safety\motor_fault.c</FilePath></File>
+            <File><FileName>motor_fault.h</FileName><FileType>5</FileType><FilePath>..\Safety\motor_fault.h</FilePath></File>
+            <File><FileName>safety_limit.c</FileName><FileType>1</FileType><FilePath>..\Safety\safety_limit.c</FilePath></File>
+            <File><FileName>safety_limit.h</FileName><FileType>5</FileType><FilePath>..\Safety\safety_limit.h</FilePath></File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>HardwareFault</GroupName>
+          <Files>
+            <File><FileName>drv_fault.c</FileName><FileType>1</FileType><FilePath>..\HardwareLayer\drv_fault.c</FilePath></File>
+            <File><FileName>drv_fault.h</FileName><FileType>5</FileType><FilePath>..\HardwareLayer\drv_fault.h</FilePath></File>
           </Files>
         </Group>
         <Group>

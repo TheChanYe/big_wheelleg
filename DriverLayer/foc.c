@@ -1,4 +1,5 @@
 #include "foc.h"
+#include "motor_fault.h"
 
 #define MOTOR_SPEED_IQ_LIMIT_A                 0.30f
 #define MOTOR_SPEED_START_IQ_STAGE1_A          0.60f
@@ -315,6 +316,32 @@ static int SaveCalibrationData(Motor_Data* motor)
 			return E_OK;
 }
 
+static int Motor_Current_Offset_Calib(Motor_Data *motor)
+{
+    TickType_t start_tick;
+
+    if (motor == NULL)
+        return E_PARAM;
+
+    Shut_PWM(motor);
+    vTaskDelay(pdMS_TO_TICKS(100));
+    motor->calib.Current_Cailb_State = WAIT;
+    motor->run_state = CALIB;
+    start_tick = xTaskGetTickCount();
+
+    while (motor->calib.Current_Cailb_State == WAIT)
+    {
+        if ((xTaskGetTickCount() - start_tick) >= pdMS_TO_TICKS(1000))
+        {
+            log_error("Motor current calibration timeout.");
+            return E_ERROR;
+        }
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+
+    return (motor->calib.Current_Cailb_State == SUCC) ? E_OK : E_ERROR;
+}
+
 /*电机参数校准*/
 static int Motor_Calib(Motor_Data* motor)
 {
@@ -324,17 +351,9 @@ static int Motor_Calib(Motor_Data* motor)
 		log_error("Motor param error.");
 		return E_PARAM; // 参数错误
 	}
-	Shut_PWM(motor);//关闭电机PWM输出
-	vTaskDelay(2000);//延时等待电机完全停止
-	/*修改电流和角度校准状态*/
-	motor->calib.Current_Cailb_State = WAIT;
 	motor->calib.Angle_Cailb_State = WAIT;
-	motor->run_state = CALIB;
-	while(motor->calib.Current_Cailb_State == WAIT)//等待电流校准完成
-	{
-		vTaskDelay(100);
-	}
-	if(motor->calib.Current_Cailb_State == SUCC)
+	ret = Motor_Current_Offset_Calib(motor);
+	if(ret == E_OK)
 	{
 		//开始校准电机角度
 		while(motor->calib.Angle_Cailb_State == WAIT)//等待角度校准完成
@@ -397,7 +416,7 @@ static int Motor_Calib(Motor_Data* motor)
 			return E_OK;
 		}	
 	}
-	else if(motor->calib.Current_Cailb_State == FAIL)
+	else
 	{
 			log_error("Motor current calibration failed.");	
 			return E_ERROR;//电流校准失败
@@ -624,18 +643,23 @@ int Motor_Init(Motor_Type motor)
 		log_error("motor control init failed.");	
 		return E_ERROR;
 	}  
-//	/*读取flash电机参数并校验数据*/
-//	if(LoadCalibrationData(g_motor) != E_OK) /*是否需要校准电机参数*/
-//	{
-//			log_warning("Loading default calibration");
-			ret = Motor_Calib(g_motor);/*是，开始执行校准程序*/
-			if(ret != E_OK)
-			{
-				log_error("Motor calibration failed.");
-				g_motor->run_state = FAULT;	
-				return E_ERROR;//电机参数校准失败
-			}
-//	}
+	/* Flash 仅复用机械角度偏置；电流零偏每次上电都重新采样。 */
+	if (LoadCalibrationData(g_motor) == E_OK)
+	{
+		log_inform("Calibration offset loaded from flash.");
+		ret = Motor_Current_Offset_Calib(g_motor);
+	}
+	else
+	{
+		log_warning("Calibration flash invalid, running full calibration.");
+		ret = Motor_Calib(g_motor);
+	}
+	if(ret != E_OK)
+	{
+		log_error("Motor calibration failed.");
+		g_motor->run_state = FAULT;
+		return E_ERROR;
+	}
 	g_motor->run_state = IDLE;
 	return E_OK;
 }
@@ -893,8 +917,7 @@ int CascadeControl_Run(Motor_Data* motor, Motor_Mode mode, float target)
 		}
 		if(ret != E_OK)
 		{
-			motor->run_state = FAULT;//电机角度获取失败
-			Close_Motor(motor);//关闭电机
+			MotorFault_Enter(0u, motor, MOTOR0_ENCODER_FAULT);
 			log_error("motor1 angle get failed.");
 
 			xSemaphoreGive(mutex);//释放互斥锁
@@ -913,8 +936,7 @@ int CascadeControl_Run(Motor_Data* motor, Motor_Mode mode, float target)
 		}
 		if(ret != E_OK)
 		{
-			motor->run_state = FAULT;//电机角度获取失败
-			Close_Motor(motor);//关闭电机
+			MotorFault_Enter(1u, motor, MOTOR1_ENCODER_FAULT);
 			log_error("motor2 angle get failed.");
 			xSemaphoreGive(mutex);//释放互斥锁
 			return E_ERROR;					

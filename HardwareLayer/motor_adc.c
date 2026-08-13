@@ -14,6 +14,14 @@ extern Motor_Data g_motor2;//电机2全局数据
 uint16_t adc_preempt_value_motor1[3];
 uint16_t adc_preempt_value_motor2[3];
 
+/* PA6 / ADC1_CH6: PVDD 经 R78(10k) / R77(1k) 分压。 */
+#define VBUS_ADC_DIVIDER_RATIO       11.0f
+#define VBUS_ADC_REF_V               3.3f
+#define VBUS_ADC_FULL_SCALE           4095.0f
+
+static float g_bus_voltage = 0.0f;
+static uint8_t g_bus_voltage_valid = 0u;
+
 #define min_offset 1.55f//电流校准偏差最小值
 #define max_offset 1.7f//电流校准偏差最小值
 #define RP  10000
@@ -94,7 +102,7 @@ int FOC_ADC_Init(Motor_Type motor) {
 		// 配置 GPIO 为模拟输入
 		gpio_default_para_init(&gpio_init_struct);
 		gpio_init_struct.gpio_mode = GPIO_MODE_ANALOG;
-		gpio_init_struct.gpio_pins = GPIO_PINS_4 | GPIO_PINS_5 | GPIO_PINS_1;//电机1 A B相电流 MOS温度 总线电压
+		gpio_init_struct.gpio_pins = GPIO_PINS_4 | GPIO_PINS_5 | GPIO_PINS_1 | GPIO_PINS_6;//电机1 A B相电流 MOS温度 总线电压
 		gpio_init(GPIOA, &gpio_init_struct);
 
 		// 配置ADC时钟
@@ -107,6 +115,10 @@ int FOC_ADC_Init(Motor_Type motor) {
 		adc_base_struct.repeat_mode = FALSE;
 		adc_base_struct.data_align = ADC_RIGHT_ALIGNMENT;
 		adc_base_config(ADC1, &adc_base_struct);
+		adc_ordinary_channel_set(ADC1, ADC_CHANNEL_6, 1,
+			ADC_SAMPLETIME_239_5);
+		adc_ordinary_conversion_trigger_set(ADC1,
+			ADC12_ORDINARY_TRIG_SOFTWARE, TRUE);
 
 		// 配置 ADC 抢占通道
 		adc_preempt_channel_length_set(ADC1, 3);//设置指定adc外设的抢占信道长度
@@ -175,6 +187,39 @@ int FOC_ADC_Init(Motor_Type motor) {
         return E_PARAM; //参数错误
     }
 		return E_OK;
+}
+
+int Motor_ADC_UpdateBusVoltage(void)
+{
+    uint32_t wait_count;
+    uint16_t raw;
+
+    adc_flag_clear(ADC1, ADC_CCE_FLAG);
+    adc_ordinary_software_trigger_enable(ADC1, TRUE);
+
+    for (wait_count = 0u; wait_count < 10000u; wait_count++)
+    {
+        if (adc_flag_get(ADC1, ADC_CCE_FLAG) == SET)
+        {
+            raw = adc_ordinary_conversion_data_get(ADC1);
+            g_bus_voltage = (float)raw * (VBUS_ADC_REF_V / VBUS_ADC_FULL_SCALE)
+                * VBUS_ADC_DIVIDER_RATIO;
+            g_bus_voltage_valid = 1u;
+            return E_OK;
+        }
+    }
+
+    return E_ERROR;
+}
+
+float Motor_ADC_GetBusVoltage(void)
+{
+    return g_bus_voltage;
+}
+
+uint8_t Motor_ADC_BusVoltageValid(void)
+{
+    return g_bus_voltage_valid;
 }
 
 /*ADC1电流采样中断处理程序*/

@@ -5,6 +5,9 @@
  */
 
 #include "system_init.h"
+#include "safety_limit.h"
+#include "motor_fault.h"
+#include "drv_fault.h"
 
 SemaphoreHandle_t mutex = NULL;
 
@@ -29,6 +32,11 @@ int System_Init(void)
     crm_periph_clock_enable(CRM_GPIOD_PERIPH_CLOCK, TRUE);
     crm_periph_clock_enable(CRM_DMA1_PERIPH_CLOCK, TRUE);
     crm_periph_clock_enable(CRM_DMA2_PERIPH_CLOCK, TRUE);
+
+    SafetyLimit_Init();
+    MotorFault_Init();
+    if (DrvFault_Init() != E_OK)
+        return E_ERROR;
 
     return E_OK;
 }
