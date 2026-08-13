@@ -12,10 +12,10 @@
 #define MOTOR_SPEED_START_MAX_MS                400u
 #define MOTOR_SPEED_TARGET_DEADBAND_RAD_S      0.10f
 #define MOTOR_SPEED_LOW_REGION_RAD_S            4.5f
-#define MOTOR_SPEED_VERY_LOW_REGION_RAD_S       2.50f
 #define MOTOR_SPEED_FRICTION_IQ_A              0.16f
-#define MOTOR_SPEED_STICTION_IQ_A              0.29f
-#define MOTOR_SPEED_VERY_LOW_IQ_LIMIT_A        0.45f
+#define MOTOR_SPEED_STALL_RECOVERY_RAD_S        1.00f
+#define MOTOR_SPEED_STICTION_IQ_A              0.44f
+#define MOTOR_SPEED_STALL_RECOVERY_IQ_LIMIT_A  0.60f
 #define MOTOR_SPEED_LOW_KP                     0.04f
 #define MOTOR_SPEED_LOW_KI_PER_S               0.20f
 #define MOTOR_SPEED_LOW_I_LIMIT_A              0.12f
@@ -151,8 +151,7 @@ static float Motor_LowSpeed_Control(Motor_Data *motor, float target,
     float target_dir = fabsf(target);
     float speed_dir = feedback * direction;
     float error_dir = target_dir - speed_dir;
-    float iq_limit = (target_dir <= MOTOR_SPEED_VERY_LOW_REGION_RAD_S)
-        ? MOTOR_SPEED_VERY_LOW_IQ_LIMIT_A : MOTOR_SPEED_IQ_LIMIT_A;
+    float iq_limit = MOTOR_SPEED_IQ_LIMIT_A;
     float stiction = 0.0f;
     float p_term_dir = MOTOR_SPEED_LOW_KP * error_dir;
     float integral_old = clamp_f(motor->speed_pid.integral * direction,
@@ -164,11 +163,14 @@ static float Motor_LowSpeed_Control(Motor_Data *motor, float target,
     float iq_dir;
     float iq_output;
 
-    if (target_dir <= MOTOR_SPEED_VERY_LOW_REGION_RAD_S && error_dir > 0.0f)
+    if (error_dir > 0.0f && speed_dir < MOTOR_SPEED_STALL_RECOVERY_RAD_S)
     {
         float denominator = (target_dir > MOTOR_SPEED_TARGET_DEADBAND_RAD_S)
             ? target_dir : MOTOR_SPEED_TARGET_DEADBAND_RAD_S;
         float underspeed_ratio = clamp_f(error_dir / denominator, 0.0f, 1.0f);
+
+        /* 仅在实际低速且欠速时提高恢复扭矩，不按目标速度硬切换。 */
+        iq_limit = MOTOR_SPEED_STALL_RECOVERY_IQ_LIMIT_A;
         stiction = MOTOR_SPEED_STICTION_IQ_A * underspeed_ratio;
     }
 
