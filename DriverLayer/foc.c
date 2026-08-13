@@ -712,6 +712,8 @@ int Motor_Update_Speed(Motor_Data *motor)
     {
         motor->first_run = 1;
         motor->angle_prev = motor->angle_data;
+        motor->filter_angle = motor->angle_data;
+        motor->circle_num = 0;
         motor->last_tick = now;
         motor->delta_raw = 0.0f;
         motor->velocity = 0.0f;
@@ -721,6 +723,11 @@ int Motor_Update_Speed(Motor_Data *motor)
     }
 
     delta = motor->angle_data - motor->angle_prev;
+    if (delta > PI)
+        motor->circle_num--;
+    else if (delta < -PI)
+        motor->circle_num++;
+    motor->filter_angle = motor->angle_data;
     while (delta > PI)
         delta -= 2.0f * PI;
     while (delta < -PI)

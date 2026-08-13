@@ -19,7 +19,6 @@ extern Motor_Data g_motor2;   /* physical MOTOR1: TMR8 */
 
 #define CAN_CMD_TIMEOUT_MS         100u
 #define CAN_CMD_STALE_MS           20u
-#define CAN_DIAG_PERIOD_MS          100u
 #define CAN_FAST_STATE_PERIOD_MS      10u
 
 static WheelCommand      g_wheel_cmd = {0};
@@ -31,10 +30,6 @@ static CanSequenceStats  g_speed_sequence = {0};
 static TickType_t        g_last_new_cmd_tick = 0;
 static uint8_t           g_cmd_active = 0;
 static volatile uint32_t g_can_telemetry_tx_fail = 0u;
-static TickType_t        g_last_state_tick = 0;
-static TickType_t        g_last_diag_tick = 0;
-static TickType_t        g_last_fast_state_tick = 0;
-static uint8_t           g_diag_pending = 0u;
 
 int can_business_init(void)
 {
@@ -58,34 +53,40 @@ void can_business_process(void)
     can_business_tick();
     now = xTaskGetTickCount();
 
-    /* 正式 Wheel State 优先占用发送邮箱，确保两路均为 100Hz。 */
-    if ((now - g_last_fast_state_tick) >= pdMS_TO_TICKS(CAN_FAST_STATE_PERIOD_MS))
+    /* 1ms phase 调度：单周期最多一个 telemetry，命令 RX 始终优先。 */
+    switch ((uint32_t)now % 100u)
     {
-        g_last_fast_state_tick = now;
+    case 0u: case 10u: case 20u: case 30u: case 40u:
+    case 50u: case 60u: case 70u: case 80u: case 90u:
         can_business_send_motor0_wheel_state();
+        break;
+    case 5u: case 15u: case 25u: case 35u: case 45u:
+    case 55u: case 65u: case 75u: case 85u: case 95u:
         can_business_send_motor1_wheel_state();
-    }
-
-    if ((now - g_last_state_tick) >= pdMS_TO_TICKS(20))
-    {
-        g_last_state_tick = now;
+        break;
+    case 2u: case 22u: case 42u: case 62u: case 82u:
         can_business_send_motor0_speed_state();
+        break;
+    case 7u: case 27u: case 47u: case 67u: case 87u:
         can_business_send_motor1_speed_state();
-        g_diag_pending = 1u;
-    }
-
-    if (g_diag_pending && (now - g_last_state_tick) >= pdMS_TO_TICKS(1))
-    {
+        break;
+    case 3u: case 23u: case 43u: case 63u: case 83u:
         can_business_send_motor0_speed_diag();
+        break;
+    case 8u: case 28u: case 48u: case 68u: case 88u:
         can_business_send_motor1_speed_diag();
-        g_diag_pending = 0u;
-    }
-
-    if ((now - g_last_diag_tick) >= pdMS_TO_TICKS(CAN_DIAG_PERIOD_MS))
-    {
-        g_last_diag_tick = now;
+        break;
+    case 1u:
         can_business_send_safety_diag();
+        break;
+    case 4u:
         can_business_send_drv_diag();
+        break;
+    case 6u:
+        can_business_send_system_diag();
+        break;
+    default:
+        break;
     }
 
 }
@@ -454,13 +455,37 @@ void can_business_send_drv_diag(void)
         g_can_telemetry_tx_fail++;
 }
 
+void can_business_send_system_diag(void)
+{
+    uint8_t data[8];
+    MotorFaultBits fault_bits = MotorFault_GetBits();
+
+    data[0] = (uint8_t)(fault_bits & 0xFFu);
+    data[1] = (uint8_t)((fault_bits >> 8) & 0xFFu);
+    data[2] = (uint8_t)((fault_bits >> 16) & 0xFFu);
+    data[3] = (uint8_t)((fault_bits >> 24) & 0xFFu);
+    data[4] = (uint8_t)g_comm_state;
+    data[5] = g_motor1.run_state;
+    data[6] = g_motor2.run_state;
+    data[7] = (g_cmd_active ? 0x01u : 0x00u)
+        | (g_motor_mode == CAN_MOTOR_MODE_SPEED ? 0x02u : 0x00u)
+        | (Motor_ADC_BusVoltageValid() ? 0x04u : 0x00u)
+        | (g_can_telemetry_tx_fail ? 0x08u : 0x00u);
+
+    if (my_can_send_std(CAN_ID_SYSTEM_DIAG, data, CAN_CMD_DLC) != E_OK)
+        g_can_telemetry_tx_fail++;
+}
+
 static void send_wheel_state(uint16_t id, Motor_Data *motor)
 {
     uint8_t data[8];
+    float direction = (motor->tmr == TMR1) ? MOTOR0_COMMAND_DIRECTION
+                                            : MOTOR1_COMMAND_DIRECTION;
     int32_t position_raw = (int32_t)((motor->filter_angle
-        + (float)motor->circle_num * cpr) * 1000.0f);
-    int16_t velocity_raw = to_i16_sat(motor->velocity * 10.0f);
-    int16_t iq_raw = to_i16_sat(motor->control.iq_current_feedback * 100.0f);
+        + (float)motor->circle_num * cpr) * direction * 1000.0f);
+    int16_t velocity_raw = to_i16_sat(motor->velocity * direction * 10.0f);
+    int16_t iq_raw = to_i16_sat(motor->control.iq_current_feedback
+        * direction * 100.0f);
 
     data[0] = (uint8_t)(position_raw & 0xFF);
     data[1] = (uint8_t)((position_raw >> 8) & 0xFF);
@@ -470,7 +495,8 @@ static void send_wheel_state(uint16_t id, Motor_Data *motor)
     data[5] = (uint8_t)((velocity_raw >> 8) & 0xFF);
     data[6] = (uint8_t)(iq_raw & 0xFF);
     data[7] = (uint8_t)((iq_raw >> 8) & 0xFF);
-    my_can_send_std(id, data, CAN_CMD_DLC);
+    if (my_can_send_std(id, data, CAN_CMD_DLC) != E_OK)
+        g_can_telemetry_tx_fail++;
 }
 
 void can_business_send_motor0_wheel_state(void)

@@ -112,7 +112,8 @@ int MotorService_Run(uint8_t motor_id)
     }
 
     if (ret != E_OK)
-        MotorFault_Enter(motor_id, motor, CONTROL_FAULT);
+        MotorFault_Enter(motor_id, motor, (motor_id == 0u)
+            ? MOTOR0_CONTROL_FAULT : MOTOR1_CONTROL_FAULT);
     else if (!MotorService_CurrentSenseIsValid(motor))
         MotorFault_Enter(motor_id, motor, (motor_id == 0u)
             ? MOTOR0_OVERCURRENT : MOTOR1_OVERCURRENT);

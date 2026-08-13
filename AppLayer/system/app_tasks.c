@@ -22,8 +22,17 @@
 
 static volatile uint8_t g_watchdog_ready = 0u;
 static volatile uint8_t g_watchdog_alive = 0u;
-static uint8_t g_watchdog_enabled = 0u;
 static TickType_t g_watchdog_start_tick = 0;
+
+static void Watchdog_HardwareInit(void)
+{
+    wdt_register_write_enable(TRUE);
+    wdt_divider_set(WDT_CLK_DIV_256);
+    wdt_reload_value_set(625u); /* LICK 40kHz 下约 4 秒。 */
+    while (wdt_flag_get(WDT_DIVF_UPDATE_FLAG | WDT_RLDF_UPDATE_FLAG));
+    wdt_enable();
+    g_watchdog_start_tick = xTaskGetTickCount();
+}
 
 static void Watchdog_MarkAlive(uint8_t bit, uint8_t ready)
 {
@@ -39,17 +48,6 @@ static void Watchdog_Process(void)
     uint8_t ready_snapshot;
     uint8_t alive_snapshot;
     TickType_t now = xTaskGetTickCount();
-
-    if (!g_watchdog_enabled)
-    {
-        wdt_register_write_enable(TRUE);
-        wdt_divider_set(WDT_CLK_DIV_256);
-        wdt_reload_value_set(625u); /* LICK 40kHz 下约 4 秒。 */
-        while (wdt_flag_get(WDT_DIVF_UPDATE_FLAG | WDT_RLDF_UPDATE_FLAG));
-        wdt_enable();
-        g_watchdog_enabled = 1u;
-        g_watchdog_start_tick = now;
-    }
 
     taskENTER_CRITICAL();
     ready_snapshot = g_watchdog_ready;
@@ -206,6 +204,9 @@ int AppTasks_Create(void)
                               STATUS_MOMITORING_TASK_PRIORITY, NULL, &g_status_task_handle);
 #endif
     taskEXIT_CRITICAL();
+
+    /* 即使 StatusTask 创建失败，硬件 WDT 也已启动并会自行复位。 */
+    Watchdog_HardwareInit();
 
     if (ret != E_OK)
         log_error("Failed to create application task");

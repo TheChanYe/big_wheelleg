@@ -30,6 +30,8 @@ typedef uint32_t MotorFaultBits;
 #define INTERNAL_FAULT             (1u << 15)
 #define MOTOR0_TEMP_SENSOR_FAULT   (1u << 16)
 #define MOTOR1_TEMP_SENSOR_FAULT   (1u << 17)
+#define MOTOR0_CONTROL_FAULT       (1u << 18)
+#define MOTOR1_CONTROL_FAULT       (1u << 19)
 
 void MotorFault_Init(void);
 void MotorFault_Enter(uint8_t motor_id, Motor_Data *motor, MotorFaultBits bits);
