@@ -20,6 +20,7 @@ extern Motor_Data g_motor2;   /* physical MOTOR1: TMR8 */
 #define CAN_CMD_TIMEOUT_MS         100u
 #define CAN_CMD_STALE_MS           20u
 #define CAN_DIAG_PERIOD_MS          100u
+#define CAN_FAST_STATE_PERIOD_MS      10u
 
 static WheelCommand      g_wheel_cmd = {0};
 static MotorSpeedCommand g_speed_cmd = {0};
@@ -32,6 +33,7 @@ static uint8_t           g_cmd_active = 0;
 static volatile uint32_t g_can_telemetry_tx_fail = 0u;
 static TickType_t        g_last_state_tick = 0;
 static TickType_t        g_last_diag_tick = 0;
+static TickType_t        g_last_fast_state_tick = 0;
 static uint8_t           g_diag_pending = 0u;
 
 int can_business_init(void)
@@ -56,6 +58,14 @@ void can_business_process(void)
     can_business_tick();
     now = xTaskGetTickCount();
 
+    /* 正式 Wheel State 优先占用发送邮箱，确保两路均为 100Hz。 */
+    if ((now - g_last_fast_state_tick) >= pdMS_TO_TICKS(CAN_FAST_STATE_PERIOD_MS))
+    {
+        g_last_fast_state_tick = now;
+        can_business_send_motor0_wheel_state();
+        can_business_send_motor1_wheel_state();
+    }
+
     if ((now - g_last_state_tick) >= pdMS_TO_TICKS(20))
     {
         g_last_state_tick = now;
@@ -77,6 +87,7 @@ void can_business_process(void)
         can_business_send_safety_diag();
         can_business_send_drv_diag();
     }
+
 }
 
 void can_business_tx_test_process(void)
@@ -441,4 +452,33 @@ void can_business_send_drv_diag(void)
 
     if (my_can_send_std(CAN_ID_DRV_DIAG, data, CAN_CMD_DLC) != E_OK)
         g_can_telemetry_tx_fail++;
+}
+
+static void send_wheel_state(uint16_t id, Motor_Data *motor)
+{
+    uint8_t data[8];
+    int32_t position_raw = (int32_t)((motor->filter_angle
+        + (float)motor->circle_num * cpr) * 1000.0f);
+    int16_t velocity_raw = to_i16_sat(motor->velocity * 10.0f);
+    int16_t iq_raw = to_i16_sat(motor->control.iq_current_feedback * 100.0f);
+
+    data[0] = (uint8_t)(position_raw & 0xFF);
+    data[1] = (uint8_t)((position_raw >> 8) & 0xFF);
+    data[2] = (uint8_t)((position_raw >> 16) & 0xFF);
+    data[3] = (uint8_t)((position_raw >> 24) & 0xFF);
+    data[4] = (uint8_t)(velocity_raw & 0xFF);
+    data[5] = (uint8_t)((velocity_raw >> 8) & 0xFF);
+    data[6] = (uint8_t)(iq_raw & 0xFF);
+    data[7] = (uint8_t)((iq_raw >> 8) & 0xFF);
+    my_can_send_std(id, data, CAN_CMD_DLC);
+}
+
+void can_business_send_motor0_wheel_state(void)
+{
+    send_wheel_state(CAN_ID_MOTOR0_WHEEL_STATE, &g_motor1);
+}
+
+void can_business_send_motor1_wheel_state(void)
+{
+    send_wheel_state(CAN_ID_MOTOR1_WHEEL_STATE, &g_motor2);
 }

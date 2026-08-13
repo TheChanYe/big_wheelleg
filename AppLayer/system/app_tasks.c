@@ -18,37 +18,50 @@
 #define WATCHDOG_STATUS_ALIVE  0x08u
 #define WATCHDOG_REQUIRED      (WATCHDOG_MOTOR0_ALIVE | WATCHDOG_MOTOR1_ALIVE \
                                 | WATCHDOG_CAN_ALIVE | WATCHDOG_STATUS_ALIVE)
+#define WATCHDOG_STARTUP_GRACE_MS 8000u
 
 static volatile uint8_t g_watchdog_ready = 0u;
 static volatile uint8_t g_watchdog_alive = 0u;
 static uint8_t g_watchdog_enabled = 0u;
+static TickType_t g_watchdog_start_tick = 0;
 
 static void Watchdog_MarkAlive(uint8_t bit, uint8_t ready)
 {
+    taskENTER_CRITICAL();
     if (ready)
         g_watchdog_ready |= bit;
     g_watchdog_alive |= bit;
+    taskEXIT_CRITICAL();
 }
 
 static void Watchdog_Process(void)
 {
+    uint8_t ready_snapshot;
+    uint8_t alive_snapshot;
+    TickType_t now = xTaskGetTickCount();
+
     if (!g_watchdog_enabled)
     {
-        if (g_watchdog_ready != WATCHDOG_REQUIRED)
-            return;
-
         wdt_register_write_enable(TRUE);
         wdt_divider_set(WDT_CLK_DIV_256);
         wdt_reload_value_set(625u); /* LICK 40kHz 下约 4 秒。 */
         while (wdt_flag_get(WDT_DIVF_UPDATE_FLAG | WDT_RLDF_UPDATE_FLAG));
         wdt_enable();
         g_watchdog_enabled = 1u;
+        g_watchdog_start_tick = now;
     }
 
-    if ((g_watchdog_alive & WATCHDOG_REQUIRED) == WATCHDOG_REQUIRED)
+    taskENTER_CRITICAL();
+    ready_snapshot = g_watchdog_ready;
+    alive_snapshot = g_watchdog_alive;
+    g_watchdog_alive = 0u;
+    taskEXIT_CRITICAL();
+
+    if ((now - g_watchdog_start_tick) < pdMS_TO_TICKS(WATCHDOG_STARTUP_GRACE_MS)
+        || (ready_snapshot == WATCHDOG_REQUIRED
+            && (alive_snapshot & WATCHDOG_REQUIRED) == WATCHDOG_REQUIRED))
     {
         wdt_counter_reload();
-        g_watchdog_alive = 0u;
     }
 }
 

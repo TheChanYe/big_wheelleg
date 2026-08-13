@@ -19,6 +19,9 @@
 #define MOS_TEMP_DERATE_C                    80.0f
 #define MOS_TEMP_FAULT_C                     90.0f
 #define MOS_TEMP_DERATE_MIN_RATIO            0.25f
+#define MOS_TEMP_FAULT_CONFIRM_COUNT          3u
+#define MOS_TEMP_RECOVER_C                    75.0f /* 需后续热负载测试复核。 */
+#define TEMP_SENSOR_FAULT_CONFIRM_COUNT       3u
 
 void SafetyLimit_Init(void);
 float MotorCommand_UpdateIq(float current, float target, float max_delta);

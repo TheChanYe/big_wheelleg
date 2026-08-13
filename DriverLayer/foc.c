@@ -751,6 +751,21 @@ uint8_t Motor_Is_Speed_Startup_Boost_Active(const Motor_Data *motor)
 {
     return (motor != NULL) ? motor->control.speed_startup_boost_active : 0u;
 }
+
+int Motor_CheckEncoder(Motor_Data *motor)
+{
+    float angle;
+    int ret = E_ERROR;
+
+    if (motor == NULL || xSemaphoreTake(mutex, pdMS_TO_TICKS(10)) != pdTRUE)
+        return E_ERROR;
+    if (motor->tmr == TMR1)
+        ret = as5047p_1.get_mech_Angle(&as5047p_1, &angle);
+    else if (motor->tmr == TMR8)
+        ret = as5047p_2.get_mech_Angle(&as5047p_2, &angle);
+    xSemaphoreGive(mutex);
+    return ret;
+}
 	
 /**
   * @brief  级联控制器初始化

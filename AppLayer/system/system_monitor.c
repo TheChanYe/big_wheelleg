@@ -17,6 +17,8 @@ extern Motor_Data g_motor2;
 #define THERMAL_VALID_SAMPLE_COUNT  3u
 
 static uint8_t g_thermal_sample_count[2] = {0u};
+static uint8_t g_temp_invalid_count[2] = {0u};
+static uint8_t g_temp_fault_count[2] = {0u};
 
 static void SystemMonitor_ThermalProtect(uint8_t motor_id,
                                          Motor_Data *motor,
@@ -28,8 +30,13 @@ static void SystemMonitor_ThermalProtect(uint8_t motor_id,
     if (Get_Mos_Temp(motor) != E_OK)
     {
         g_thermal_sample_count[motor_id] = 0u;
+        if (++g_temp_invalid_count[motor_id] >= TEMP_SENSOR_FAULT_CONFIRM_COUNT)
+            MotorFault_Enter(motor_id, motor, (motor_id == 0u)
+                ? MOTOR0_TEMP_SENSOR_FAULT : MOTOR1_TEMP_SENSOR_FAULT);
         return;
     }
+
+    g_temp_invalid_count[motor_id] = 0u;
 
     /* 上电初始 ADC 值可能尚未稳定，先完成少量有效采样。 */
     if (g_thermal_sample_count[motor_id] < THERMAL_VALID_SAMPLE_COUNT)
@@ -40,9 +47,12 @@ static void SystemMonitor_ThermalProtect(uint8_t motor_id,
 
     if (motor->mos_temp >= MOS_TEMP_FAULT_C)
     {
-        MotorFault_Enter(motor_id, motor, fault_bit);
+        if (++g_temp_fault_count[motor_id] >= MOS_TEMP_FAULT_CONFIRM_COUNT)
+            MotorFault_Enter(motor_id, motor, fault_bit);
         return;
     }
+
+    g_temp_fault_count[motor_id] = 0u;
 
     if (motor->mos_temp >= MOS_TEMP_DERATE_C)
     {

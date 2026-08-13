@@ -19,6 +19,8 @@
 #define CAN_ID_MOTOR1_SPEED_DIAG      0x205u
 #define CAN_ID_SAFETY_DIAG             0x206u
 #define CAN_ID_DRV_DIAG                0x207u
+#define CAN_ID_MOTOR0_WHEEL_STATE      0x208u
+#define CAN_ID_MOTOR1_WHEEL_STATE      0x209u
 
 #define CAN_CMD_DLC                   8u
 #define CAN_CMD_FLAG_ENABLE           0x01u
@@ -93,6 +95,8 @@ void can_business_send_motor1_speed_state(void);
 void can_business_send_motor1_speed_diag(void);
 void can_business_send_safety_diag(void);
 void can_business_send_drv_diag(void);
+void can_business_send_motor0_wheel_state(void);
+void can_business_send_motor1_wheel_state(void);
 
 int can_business_process_frame(uint16_t id,
                                const uint8_t *data,

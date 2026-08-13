@@ -28,6 +28,8 @@ typedef uint32_t MotorFaultBits;
 #define CALIBRATION_FAULT          (1u << 13)
 #define CONTROL_FAULT              (1u << 14)
 #define INTERNAL_FAULT             (1u << 15)
+#define MOTOR0_TEMP_SENSOR_FAULT   (1u << 16)
+#define MOTOR1_TEMP_SENSOR_FAULT   (1u << 17)
 
 void MotorFault_Init(void);
 void MotorFault_Enter(uint8_t motor_id, Motor_Data *motor, MotorFaultBits bits);
@@ -36,5 +38,6 @@ void MotorFault_EnterFromISR(uint8_t motor_id, Motor_Data *motor,
 MotorFaultBits MotorFault_GetBits(void);
 uint8_t MotorFault_MotorHasFault(uint8_t motor_id);
 uint8_t MotorFault_ClearMotor(uint8_t motor_id);
+uint8_t MotorFault_CanClear(uint8_t motor_id, Motor_Data *motor);
 
 #endif /* MOTOR_FAULT_H */

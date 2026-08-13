@@ -29,7 +29,7 @@ static float MotorService_CommandDirection(uint8_t motor_id)
                             : MOTOR1_COMMAND_DIRECTION;
 }
 
-static uint8_t MotorService_CurrentSenseInvalid(const Motor_Data *motor)
+uint8_t MotorService_CurrentSenseIsValid(const Motor_Data *motor)
 {
     float ia_voltage;
     float ib_voltage;
@@ -37,7 +37,7 @@ static uint8_t MotorService_CurrentSenseInvalid(const Motor_Data *motor)
     if (!isfinite(motor->current_abc.Ia) || !isfinite(motor->current_abc.Ib)
         || !isfinite(motor->current_abc.Ic)
         || !isfinite(motor->control.iq_current_feedback))
-        return 1u;
+        return 0u;
 
     /* 电流可测量范围由每相零偏决定，不能用 3.3V 直接换算电流。 */
     ia_voltage = motor->calib.ia_offset
@@ -45,10 +45,10 @@ static uint8_t MotorService_CurrentSenseInvalid(const Motor_Data *motor)
     ib_voltage = motor->calib.ib_offset
         - motor->current_abc.Ib * G * Sampling_resistor;
 
-    return (ia_voltage <= CURRENT_SENSE_ADC_LOW_V
-        || ia_voltage >= CURRENT_SENSE_ADC_HIGH_V
-        || ib_voltage <= CURRENT_SENSE_ADC_LOW_V
-        || ib_voltage >= CURRENT_SENSE_ADC_HIGH_V) ? 1u : 0u;
+    return (ia_voltage > CURRENT_SENSE_ADC_LOW_V
+        && ia_voltage < CURRENT_SENSE_ADC_HIGH_V
+        && ib_voltage > CURRENT_SENSE_ADC_LOW_V
+        && ib_voltage < CURRENT_SENSE_ADC_HIGH_V) ? 1u : 0u;
 }
 
 int MotorService_Init(uint8_t motor_id)
@@ -113,7 +113,7 @@ int MotorService_Run(uint8_t motor_id)
 
     if (ret != E_OK)
         MotorFault_Enter(motor_id, motor, CONTROL_FAULT);
-    else if (MotorService_CurrentSenseInvalid(motor))
+    else if (!MotorService_CurrentSenseIsValid(motor))
         MotorFault_Enter(motor_id, motor, (motor_id == 0u)
             ? MOTOR0_OVERCURRENT : MOTOR1_OVERCURRENT);
     return ret;
@@ -127,7 +127,7 @@ int MotorService_ClearFault(uint8_t motor_id)
         return E_PARAM;
     if (!MotorFault_MotorHasFault(motor_id))
         return E_OK;
-    if (DrvFault_IsActive(motor_id))
+    if (!MotorFault_CanClear(motor_id, motor))
         return E_ERROR;
 
     SafetyLimit_ForceZero(motor_id);
