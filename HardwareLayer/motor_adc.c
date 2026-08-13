@@ -1,6 +1,7 @@
 #include "motor_adc.h"
 #include "foc.h"
 #include "app_tasks.h"
+#include <math.h>
 #define MODULE_NAME       "motor_adc"
 
 #ifdef  MODE_LOG_TAG
@@ -24,21 +25,9 @@ static uint8_t g_bus_voltage_valid = 0u;
 
 #define min_offset 1.55f//电流校准偏差最小值
 #define max_offset 1.7f//电流校准偏差最小值
-#define RP  10000
-#define T2  (273.15f + 25.0f)
-#define BX  3950.0f
-#define KA  273.15f
-
-/*温度查表-10度-79度*/
-double g_RTTable[] = {56.071, 53.078, 50.263, 74.614, 45.121, 42.774, 40.563, 38.480, 36.517, 34.665,
-					  32.919, 31.270, 29.715, 28.246, 26.858, 25.547, 24.307, 23.135, 22.026, 20.977, 
-					  19.987, 19.044, 18.154, 17.310, 16.510, 15.752, 15.034, 14.352, 13.705, 13.090, 
-					  12.507, 11.953, 11.427, 10.927, 10.452, 10.000, 9.570,  9.161,  8.771,  8.401,  
-					  8.048,  7.712,  7.391,  7.086,  6.795,  6.518,  6.254,  6.001,  5.761,  5.531, 
-					  5.311,  5.102,  4.902,  4.710,  4.528,  4.353,  4.186,  4.026,  3.874,  3.728,
-					  3.588,  3.454,	3.326,	3.203,	3.085,	2.973,	2.865,	2.761,	2.662,	2.567,
-					  2.476,  2.388,	2.304,	2.223,	2.146,	2.072,	2.000,	1.932,	1.866,	1.803,
-					  1.742,  1.684,	1.627,	1.573,	1.521,	1.471,	1.423,	1.377,	1.332,	1.289};
+#define NTC_R25_OHM  10000.0f
+#define NTC_BETA      3950.0f
+#define NTC_T25_K     298.15f
 
 
 /*adc校准中间参数结构体*/
@@ -51,41 +40,21 @@ typedef struct{
 Adc_Data motor_adc1;
 Adc_Data motor_adc2;
 
-static float getTemp(int t2, float r1, float r2, float r)
-{
-    float t;
-    t = t2 - (r2 - r) / (r2 - r1);
-		if(t2<10)
-		{
-			t=-(10-t);			
-		}
-		else
-		{
-			t-=10;
-		}
-    return t;
-}
-//  根据电阻查表获取温度
+/* r 单位为 kOhm；标准 10k B3950 NTC 可覆盖至少 -40~125°C。 */
 float queryTemp(float r)
 {
-    if (r < 1.289f)
-		{
-			return 79;		
-		}
-		else if(r > 56.071f)
-		{
-      return -10;			
-		}
-    
-    float t;
-    int i = 0;
-    for (; i < 90; i++)
-    {
-        if (r >= g_RTTable[i])
-            break;
-    } 
-    t = getTemp(i, g_RTTable[i - 1], g_RTTable[i], r);
-    return t;
+    float temp;
+
+    if (r <= 0.0f)
+        return 125.0f;
+
+    temp = 1.0f / ((1.0f / NTC_T25_K)
+        + logf((r * 1000.0f) / NTC_R25_OHM) / NTC_BETA) - 273.15f;
+    if (temp < -40.0f)
+        return -40.0f;
+    if (temp > 125.0f)
+        return 125.0f;
+    return temp;
 }
 
 

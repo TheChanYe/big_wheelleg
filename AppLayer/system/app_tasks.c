@@ -146,7 +146,7 @@ static void StatusTask(void *argument)
         SystemMonitor_Process();
         Watchdog_MarkAlive(WATCHDOG_STATUS_ALIVE, 1u);
         Watchdog_Process();
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
 

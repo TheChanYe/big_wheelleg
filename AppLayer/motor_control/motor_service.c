@@ -29,18 +29,26 @@ static float MotorService_CommandDirection(uint8_t motor_id)
                             : MOTOR1_COMMAND_DIRECTION;
 }
 
-static uint8_t MotorService_CurrentInvalid(const Motor_Data *motor)
+static uint8_t MotorService_CurrentSenseInvalid(const Motor_Data *motor)
 {
+    float ia_voltage;
+    float ib_voltage;
+
     if (!isfinite(motor->current_abc.Ia) || !isfinite(motor->current_abc.Ib)
         || !isfinite(motor->current_abc.Ic)
         || !isfinite(motor->control.iq_current_feedback))
         return 1u;
 
-    return (fabsf(motor->current_abc.Ia) >= MOTOR_PHASE_CURRENT_FAULT_A
-        || fabsf(motor->current_abc.Ib) >= MOTOR_PHASE_CURRENT_FAULT_A
-        || fabsf(motor->current_abc.Ic) >= MOTOR_PHASE_CURRENT_FAULT_A
-        || fabsf(motor->control.iq_current_feedback)
-            >= MOTOR_PHASE_CURRENT_FAULT_A) ? 1u : 0u;
+    /* 电流可测量范围由每相零偏决定，不能用 3.3V 直接换算电流。 */
+    ia_voltage = motor->calib.ia_offset
+        - motor->current_abc.Ia * G * Sampling_resistor;
+    ib_voltage = motor->calib.ib_offset
+        - motor->current_abc.Ib * G * Sampling_resistor;
+
+    return (ia_voltage <= CURRENT_SENSE_ADC_LOW_V
+        || ia_voltage >= CURRENT_SENSE_ADC_HIGH_V
+        || ib_voltage <= CURRENT_SENSE_ADC_LOW_V
+        || ib_voltage >= CURRENT_SENSE_ADC_HIGH_V) ? 1u : 0u;
 }
 
 int MotorService_Init(uint8_t motor_id)
@@ -105,7 +113,7 @@ int MotorService_Run(uint8_t motor_id)
 
     if (ret != E_OK)
         MotorFault_Enter(motor_id, motor, CONTROL_FAULT);
-    else if (MotorService_CurrentInvalid(motor))
+    else if (MotorService_CurrentSenseInvalid(motor))
         MotorFault_Enter(motor_id, motor, (motor_id == 0u)
             ? MOTOR0_OVERCURRENT : MOTOR1_OVERCURRENT);
     return ret;

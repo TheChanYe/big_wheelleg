@@ -202,40 +202,7 @@ c_drv8301 drv8301_1 = {0};
 c_as5047p as5047p_2 = {0};
 c_drv8301 drv8301_2 = {0};
 //u8 read = 0;
- #define ARRAY_SIZE  50
-//  各温度滑动窗口数组大小
-float motor1[ARRAY_SIZE] = {0};
-float motor2[ARRAY_SIZE] = {0};
-int g_cnt_motor1 = 0;
-int g_cnt_motor2 = 0;
 float new_speed = 0.0f;
-/*温度滤波函数*/
-float getAvg(float newTemp,float* temps,int* count)
-{
-    int cnt = ARRAY_SIZE;
-    if (*count < ARRAY_SIZE)
-    {
-        temps[*count] = newTemp;
-        cnt = ++*count;
-    }
-    else
-    {
-        for (int i = 0; i < ARRAY_SIZE - 1; i++)
-        {
-            temps[i] = temps[i + 1];   
-        }
-        temps[ARRAY_SIZE - 1] = newTemp;
-    }
-
-    float sum = 0;
-    for (int i = 0; i < cnt; i++)
-    {
-        sum += temps[i];
-    }
-
-    float ret = sum / cnt;
-    return ret;
-}
 
 /*--------------------- 函数声明 ---------------------*/
 static int Motor_Control_Init(Motor_Data* motor);
@@ -682,14 +649,7 @@ int Get_Mos_Temp(Motor_Data* motor)
 	/*计算热敏电阻当前阻值*/
 	rt = motor->mos_voltage / ((3.3f - motor->mos_voltage) / 10000.0f);
     temp = queryTemp(rt / 1000);
-	if(motor->tmr == TMR1)
-	{
-		motor->mos_temp = getAvg(temp, motor1, &g_cnt_motor1);
-	}
-	else if(motor->tmr == TMR8)
-	{
-		motor->mos_temp = getAvg(temp, motor2, &g_cnt_motor2);
-	}
+	motor->mos_temp = temp;
 //	if(read == 1)
 //	{
 //		/* 获取互斥锁（带超时） */
