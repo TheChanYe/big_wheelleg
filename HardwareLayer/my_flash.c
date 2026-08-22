@@ -150,7 +150,8 @@ int flash_write(uint32_t addr, uint16_t *data, uint16_t size)
     while (1)
 		{
         // 读取当前扇区的数据到缓冲区
-        flash_read(sector_position * FLASH_PAGE_SIZE + FLASH_BASE, page_buffer, FLASH_PAGE_SIZE / 2);
+        /* page_buffer 容量为整页；读取长度单位为字节，必须完整备份 2KB 页。 */
+        flash_read(sector_position * FLASH_PAGE_SIZE + FLASH_BASE, page_buffer, FLASH_PAGE_SIZE);
         // 检查扇区内是否有非 0xFFFF 的数据
         for (i = 0; i < sector_remain; i++)
 				{	

@@ -81,6 +81,22 @@ static float clamp_f(float value, float min_value, float max_value)
     return value;
 }
 
+static float Motor_Apply_Encoder_Direction(const Motor_Data *motor,
+                                           float raw_angle)
+{
+    float angle = raw_angle;
+    float direction = (motor->tmr == TMR8) ? MOTOR1_ENCODER_DIRECTION
+                                            : MOTOR0_ENCODER_DIRECTION;
+
+    if (direction < 0.0f)
+    {
+        angle = cpr - angle;
+        if (angle >= cpr)
+            angle = 0.0f;
+    }
+    return angle;
+}
+
 static float Motor_Speed_Get_Startup_Confirm(float target)
 {
     return clamp_f(fabsf(target) * MOTOR_SPEED_START_CONFIRM_RATIO,
@@ -325,7 +341,7 @@ static int Motor_Calib(Motor_Data* motor)
 		//开始校准电机角度
 		while(motor->calib.Angle_Cailb_State == WAIT)//等待角度校准完成
 		{
-			motor->voltage_dq.Vd=0.5f;//D轴给电压 将转子拉到0点
+			motor->voltage_dq.Vd=(motor->tmr == TMR1) ? 1.0f : 0.5f;//D轴给电压 将转子拉到0点
 			motor->voltage_dq.Vq=0.0f;                                                                                                                                                                       
 			RevParkOperate(motor->voltage_dq.Vd , motor->voltage_dq.Vq, 0 , &motor->voltage_alpha_beta.Valpha, &motor->voltage_alpha_beta.Vbeta );//反Park变换
 			SvpwmAlgorithm(motor, motor->voltage_alpha_beta.Valpha, motor->voltage_alpha_beta.Vbeta, Udc, TMR_CLOCK/TMR_PWM );
@@ -354,7 +370,10 @@ static int Motor_Calib(Motor_Data* motor)
 				}
 			}
 			xSemaphoreGive(mutex);//释放互斥锁
-			if(ret != E_OK || motor->calib.angle_offset == 0.0f )
+			motor->calib.angle_offset = Motor_Apply_Encoder_Direction(
+				motor, motor->calib.angle_offset);
+			/* 0rad 是合法的编码器零位，通信错误才判定角度校准失败。 */
+			if(ret != E_OK)
 			{
 				motor->calib.Angle_Cailb_State = FAIL;//电机角度校准失败
 				log_error("Motor angle calibration failed.");
@@ -641,8 +660,8 @@ int Get_Mos_Temp(Motor_Data* motor)
 	float temp = 0;
    if(motor == NULL) 
 		return E_PARAM; 
-	/*如果电压大于3.13f，断定热敏电阻没有连接 返回硬件错误*/
-	if(motor->mos_voltage >=3.13f)
+	/* 0V 与接近 AVCC 都是 ADC 未就绪或 NTC 断线，不能参与温度换算。 */
+	if(motor->mos_voltage <= 0.05f || motor->mos_voltage >=3.13f)
 	{
 		return E_ERROR;					
 	}
@@ -905,6 +924,8 @@ int CascadeControl_Run(Motor_Data* motor, Motor_Mode mode, float target)
 			xSemaphoreGive(mutex);//释放互斥锁
 			return E_ERROR;					
 		}
+		motor->angle_data = Motor_Apply_Encoder_Direction(motor,
+			motor->angle_data);
 	}	
 	else if(motor->tmr == TMR8)
 	{
@@ -923,6 +944,8 @@ int CascadeControl_Run(Motor_Data* motor, Motor_Mode mode, float target)
 			xSemaphoreGive(mutex);//释放互斥锁
 			return E_ERROR;					
 		}
+		motor->angle_data = Motor_Apply_Encoder_Direction(motor,
+			motor->angle_data);
 	}
 	xSemaphoreGive(mutex);//释放互斥锁
 	Motor_Update_Speed(motor);

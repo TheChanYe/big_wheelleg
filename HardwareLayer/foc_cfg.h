@@ -21,6 +21,11 @@
 #define MOTOR0_COMMAND_DIRECTION  1.0f
 #define MOTOR1_COMMAND_DIRECTION  1.0f
 
+/* 两路编码器方向由台架实测确定。 */
+#define MOTOR0_ENCODER_DIRECTION  1.0f
+#define MOTOR1_ENCODER_DIRECTION  1.0f
+
+
 /*****************定时器参数*******************************/
 #define TMR_CLOCK 240000000                                          // 定时器时钟频率 240MHz
 #define TMR_PWM 20000                                                // PWM频率 24kHz
@@ -247,3 +252,4 @@ typedef struct{
 #endif 
 
 
+/* Motor0 三相相序相对逻辑坐标偏移 +120° 电角度。 */
