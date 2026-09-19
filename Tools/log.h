@@ -18,12 +18,9 @@
 #ifndef MODE_LOG_TAG
 #define MODE_LOG_TAG "sys"
 #endif
-#define common_log(str, format, ...) do{\
-											printf("%s %s %d %s:"format"\r\n",\
-												   MODE_LOG_TAG,\
-												   str,\
-												   __LINE__, __FUNCTION__,##__VA_ARGS__);\
-									   }while(0)
+#define common_log(str, format, ...) do { \
+    log_printf(MODE_LOG_TAG, str, __LINE__, __FUNCTION__, format, ##__VA_ARGS__); \
+} while (0)
 
 #define log_inform(format, ...)   common_log("[I]",  format, ##__VA_ARGS__)
 #define log_debug(format, ...)   common_log("[D]",  format, ##__VA_ARGS__)
@@ -38,7 +35,17 @@
 * Return: 无
 * Others: 无
 *************************************************/
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int log_init(void);
+void log_printf(const char *module, const char *level, int line,
+                const char *function, const char *format, ...);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 

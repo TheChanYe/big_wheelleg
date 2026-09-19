@@ -10,6 +10,10 @@
 
 #include "main.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int DrvFault_Init(void);
 void DrvFault_MotorReady(uint8_t motor_id);
 void DrvFault_Process(void);
@@ -17,5 +21,9 @@ void DrvFault_NotifyFromISR(uint8_t motor_id);
 uint8_t DrvFault_IsActive(uint8_t motor_id);
 uint16_t DrvFault_GetStatus1(uint8_t motor_id);
 uint16_t DrvFault_GetStatus2(uint8_t motor_id);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* DRV_FAULT_H */

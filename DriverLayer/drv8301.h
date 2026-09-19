@@ -92,16 +92,28 @@
 
 typedef struct __C_DRV8301 c_drv8301;
 
+#ifdef __cplusplus
+#define DRV8301_CONTEXT_FIELD context
+extern "C" {
+#else
+#define DRV8301_CONTEXT_FIELD this
+#endif
+
 typedef struct __C_DRV8301
 {
-    void* this;
-		int (*close_drive)(const c_drv8301* this);
-		int (*open_drive)(const c_drv8301* this);
-		int (*write_data)(const c_drv8301* this,u8 datasize,const u16* send_data,u16* read_data);
-		int (*get_status_register)(const c_drv8301* this,u16 *register1,u16 *register2);
+    void* DRV8301_CONTEXT_FIELD;
+		int (*close_drive)(const c_drv8301* self);
+		int (*open_drive)(const c_drv8301* self);
+		int (*write_data)(const c_drv8301* self,u8 datasize,const u16* send_data,u16* read_data);
+		int (*get_status_register)(const c_drv8301* self,u16 *register1,u16 *register2);
 }c_drv8301;
 c_drv8301 drv8301_create(u8 spi_channal,gpio_type* cs_gpio,uint32_t cs_pin,
-																				gpio_type* en_gate_gpio,uint32_t en_gate_pin);
+																gpio_type* en_gate_gpio,uint32_t en_gate_pin);
+
+#ifdef __cplusplus
+}
+#endif
+#undef DRV8301_CONTEXT_FIELD
 
 
 #endif

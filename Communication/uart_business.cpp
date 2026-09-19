@@ -6,26 +6,26 @@
 
 #include "uart_business.h"
 #include "my_usart.h"
-#include "foc.h"
+#include "foc_cfg.h" // 仅访问 Motor_Data，不引入尚未 C++ 化的驱动头。
 
 extern Motor_Data g_motor1;
 
 static char g_send_buf[256];
 
-static void uart_receive_callback(char *data, size_t length)
+void UartBusiness::receiveCallback(char *data, size_t length)
 {
     log_inform("Received data: %zu %.*s", length, (int)length, data);
 }
 
-int uart_business_init(void)
+int UartBusiness::init()
 {
     UartDriver_t *uart_driver = get_uart_driver();
     uart_driver->init();
-    uart_driver->set_receive_callback(uart_receive_callback);
+    uart_driver->set_receive_callback(receiveCallback);
     return E_OK;
 }
 
-void uart_business_process(void)
+void UartBusiness::process()
 {
     UartDriver_t *uart_driver = get_uart_driver();
     memset(g_send_buf, 0, strlen(g_send_buf));
@@ -33,4 +33,15 @@ void uart_business_process(void)
              g_motor1.control.speed_target, g_motor1.velocity,
              g_motor1.control.iq_current_target);
     uart_driver->send(g_send_buf, strlen(g_send_buf));
+}
+
+// 原 C 入口留给现有任务调用；硬件驱动仍以 C 编译。
+extern "C" int uart_business_init(void)
+{
+    return UartBusiness::init();
+}
+
+extern "C" void uart_business_process(void)
+{
+    UartBusiness::process();
 }

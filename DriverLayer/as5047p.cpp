@@ -1,4 +1,4 @@
-#include "as5047p.h"
+#include "as5047p.h" // 传感器 SPI 读取保留现有 C ABI。
 #include "switch.h"
 #define MODULE_NAME "as5047p"
 
@@ -15,27 +15,27 @@ typedef struct __M_AS5047P
 } m_as5047p;
 
 static unsigned int even_check(unsigned int x); // 偶校验函数声明
-static int m_get_Data(const c_as5047p* this, float *Data); // 获取数据函数声明
-static int m_get_Angle(const c_as5047p* this, float *Angle); // 获取角度函数声明
-static int m_get_mech_Angle(const c_as5047p* this, float *mech_Angle); // 获取机械角度函数声明
-static int m_get_Electrical_Angle(const c_as5047p* this, float *Electrical_Angle); // 获取电气角度函数声明
+static int m_get_Data(const c_as5047p* self, float *Data); // 获取数据函数声明
+static int m_get_Angle(const c_as5047p* self, float *Angle); // 获取角度函数声明
+static int m_get_mech_Angle(const c_as5047p* self, float *mech_Angle); // 获取机械角度函数声明
+static int m_get_Electrical_Angle(const c_as5047p* self, float *Electrical_Angle); // 获取电气角度函数声明
 
 /* 创建 AS5047P 对象 */
 c_as5047p as5047p_create(u8 spi_channal, gpio_type* cs_gpio, uint32_t cs_pin)
 {
     int ret = 0; // 返回值
-    c_as5047p new = {0}; // 初始化新对象
+    c_as5047p instance = {0}; // 初始化新对象
     m_as5047p* m_this = NULL; // 内部结构体指针
 
     /* 为新对象申请内存 */
-    new.this = pvPortMalloc(sizeof(m_as5047p)); // 分配内存
-    if (NULL == new.this)
+    instance.context = pvPortMalloc(sizeof(m_as5047p)); // 分配内存
+    if (NULL == instance.context)
     {
         log_error("Out of memory"); // 内存不足错误日志
-        return new; // 返回空对象
+        return instance; // 返回空对象
     }
-    memset(new.this, 0, sizeof(m_as5047p)); // 初始化内存
-    m_this = new.this;
+    memset(instance.context, 0, sizeof(m_as5047p)); // 初始化内存
+    m_this = static_cast<m_as5047p*>(instance.context);
 
     /* 初始化相应的 SPI */
     ret = my_spi.init(spi_channal); // 初始化 SPI
@@ -59,24 +59,24 @@ c_as5047p as5047p_create(u8 spi_channal, gpio_type* cs_gpio, uint32_t cs_pin)
     m_this->cs_gpio = cs_gpio; // 保存 CS GPIO
     m_this->cs_pin = cs_pin; // 保存 CS 引脚
     m_this->m_spi_channal = spi_channal; // 保存 SPI 通道
-    new.get_Data = m_get_Data; // 设置获取数据函数
-    new.get_Angle = m_get_Angle; // 设置获取角度函数
-    new.get_mech_Angle = m_get_mech_Angle; // 设置获取机械角度函数
-    new.get_Electrical_Angle = m_get_Electrical_Angle; // 设置获取电气角度函数
+    instance.get_Data = m_get_Data; // 设置获取数据函数
+    instance.get_Angle = m_get_Angle; // 设置获取角度函数
+    instance.get_mech_Angle = m_get_mech_Angle; // 设置获取机械角度函数
+    instance.get_Electrical_Angle = m_get_Electrical_Angle; // 设置获取电气角度函数
 
     gpio_bits_write(m_this->cs_gpio, m_this->cs_pin, TRUE); // 设置 CS 引脚为高电平
     vTaskDelay(50); // 延时 50 ms
-    return new; // 返回新对象
+    return instance; // 返回新对象
 
 error_handle:
 
-		vPortFree(new.this); // 释放内存
-		new.this = NULL; // 设置指针为空
-    return new; // 返回空对象
+		vPortFree(instance.context); // 释放内存
+		instance.context = NULL; // 设置指针为空
+    return instance; // 返回空对象
 }
 
 /* 读取数据 */
-static int m_read_data(const c_as5047p* this, u16 *recv_buff)
+static int m_read_data(const c_as5047p* self, u16 *recv_buff)
 {
     m_as5047p* m_this = NULL; // 内部结构体指针
     int ret = 0; // 返回值
@@ -84,12 +84,12 @@ static int m_read_data(const c_as5047p* this, u16 *recv_buff)
     u16 error_data = 0; // 错误数据变量
 
     /* 参数检测 */
-    if (NULL == this || NULL == this->this)
+    if (NULL == self || NULL == self->context)
     {
         log_error("Null pointer."); // 空指针错误日志
         return E_NULL; // 返回空指针错误
     }
-    m_this = this->this;
+    m_this = static_cast<m_as5047p*>(self->context);
     /* 选中片选 */
     gpio_bits_write(m_this->cs_gpio, m_this->cs_pin, FALSE); // 设置 CS 引脚为低电平
     /* 发送数据 */
@@ -154,16 +154,16 @@ static unsigned int even_check(unsigned int x)
 }
 
 /* 获取原始数据 */
-static int m_get_Data(const c_as5047p* this, float *Data)
+static int m_get_Data(const c_as5047p* self, float *Data)
 {
     /* 参数检测 */
-    if (NULL == this || NULL == this->this)
+    if (NULL == self || NULL == self->context)
     {
         log_error("Null pointer."); // 空指针错误日志
         return E_NULL; // 返回空指针错误
     }
     u16 recv_data = 0; // 接收数据变量
-    int ret = m_read_data(this, &recv_data); // 读取数据
+    int ret = m_read_data(self, &recv_data); // 读取数据
     if (ret != E_OK)
     {
         return ret; // 返回错误
@@ -173,16 +173,16 @@ static int m_get_Data(const c_as5047p* this, float *Data)
 }
 
 /* 获取角度 */
-static int m_get_Angle(const c_as5047p* this, float *Angle)
+static int m_get_Angle(const c_as5047p* self, float *Angle)
 {
     /* 参数检测 */
-    if (NULL == this || NULL == this->this)
+    if (NULL == self || NULL == self->context)
     {
         log_error("Null pointer."); // 空指针错误日志
         return E_NULL; // 返回空指针错误
     }
     u16 recv_data = 0; // 接收数据变量
-    int ret = m_read_data(this, &recv_data); // 读取数据
+    int ret = m_read_data(self, &recv_data); // 读取数据
     if (ret != E_OK)
     {
         return ret; // 返回错误
@@ -192,16 +192,16 @@ static int m_get_Angle(const c_as5047p* this, float *Angle)
 }
 
 /* 获取机械角度 */
-static int m_get_mech_Angle(const c_as5047p* this, float *mech_Angle)
+static int m_get_mech_Angle(const c_as5047p* self, float *mech_Angle)
 {
     /* 参数检测 */
-    if (NULL == this || NULL == this->this)
+    if (NULL == self || NULL == self->context)
     {
         log_error("Null pointer."); // 空指针错误日志
         return E_NULL; // 返回空指针错误
     }
     u16 recv_data = 0; // 接收数据变量
-    int ret = m_read_data(this, &recv_data); // 读取数据
+    int ret = m_read_data(self, &recv_data); // 读取数据
     if (ret != E_OK)
     {
         return ret; // 返回错误
@@ -211,16 +211,16 @@ static int m_get_mech_Angle(const c_as5047p* this, float *mech_Angle)
 }
 
 /* 获取电气角度 */
-static int m_get_Electrical_Angle(const c_as5047p* this, float *Electrical_Angle)
+static int m_get_Electrical_Angle(const c_as5047p* self, float *Electrical_Angle)
 {
     /* 参数检测 */
-    if (NULL == this || NULL == this->this)
+    if (NULL == self || NULL == self->context)
     {
         log_error("Null pointer."); // 空指针错误日志
         return E_NULL; // 返回空指针错误
     }
     u16 recv_data = 0; // 接收数据变量
-    int ret = m_read_data(this, &recv_data); // 读取数据POLE_PAIR_NUM
+    int ret = m_read_data(self, &recv_data); // 读取数据POLE_PAIR_NUM
     if (ret != E_OK)
     {
         return ret; // 返回错误

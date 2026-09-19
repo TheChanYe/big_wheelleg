@@ -13,7 +13,9 @@
         "python.analysis.extraPaths": [
             "/opt/ros/humble/lib/python3.10/site-packages",
             "/opt/ros/humble/local/lib/python3.10/dist-packages"
-        ]
+        ],
+        "cortex-debug.gdbPath": "/usr/bin/gdb-multiarch",
+        "cortex-debug.JLinkGDBServerPath": "/usr/bin/JLinkGDBServerCLExe"
     },
     "extensions": {}
 }

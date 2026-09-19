@@ -1,4 +1,4 @@
-#include "my_usart.h"
+#include "my_usart.h" // 原 UART 函数表接口保持不变。
 #include "task_config.h"
 #define MODULE_NAME "my_usart"
 
@@ -36,18 +36,24 @@ static UartBuffer_t rxBuffer; // 接收缓冲区结构体
 // 函数声明
 static void usart_configuration(void); // USART配置函数
 static void m_send(char *data, uint16_t data_len); // 发送函数
+static int uart_try_send(const char *data, uint16_t data_len); // 日志非阻塞发送
 static void UART_RxCallback(void); // 接收回调函数
 static void set_receive_callback(void (*callback)(char *data, size_t length)); // 设置接收回调函数
 static void UART_TxTask(void *pvParameters); // 发送任务函数
 static void UART_RxTask(void *pvParameters); // 接收任务函数
 
 // 中断服务程序声明
-void USART2_IRQHandler(void); // USART2中断服务程序
-void DMA1_Channel7_IRQHandler(void); // DMA1通道7中断服务程序
+extern "C" void USART2_IRQHandler(void); // USART2中断服务程序
+extern "C" void DMA1_Channel7_IRQHandler(void); // DMA1通道7中断服务程序
 
 // USART配置函数
 static void usart_configuration(void)
 {
+    static bool uart_initialized = false;
+    if (uart_initialized)
+    {
+        return; // main 已初始化时，UART 业务任务不可再次复位 DMA/创建队列。
+    }
     gpio_init_type gpio_init_struct; // GPIO初始化结构体
     dma_init_type dma_init_struct; // DMA初始化结构体
     usart_type *usartx = USART2; // 选择USART2
@@ -127,6 +133,11 @@ static void usart_configuration(void)
 //    // 进入临界区
 //    taskENTER_CRITICAL();
 
+    if (uartTxQueue == NULL || uartRxQueue == NULL)
+    {
+        return;
+    }
+
     // 创建发送任务
     if (xTaskCreate(UART_TxTask, "UART_TxTask", UART_TX_TASK_STACK_SIZE, NULL, UART_TASK_PRIORITY, &uartTxTaskHandle) != pdPASS)
     {
@@ -138,6 +149,8 @@ static void usart_configuration(void)
     {
         log_error("Failed to create UART_RxTask"); // 打印错误信息
     }
+
+    uart_initialized = (uartTxTaskHandle != NULL && uartRxTaskHandle != NULL);
 
 //    // 退出临界区
 //    taskEXIT_CRITICAL();
@@ -215,6 +228,19 @@ static void m_send(char *data, uint16_t data_len)
     }
 }
 
+static int uart_try_send(const char *data, uint16_t data_len)
+{
+    if (uartTxQueue == NULL || data == NULL || data_len == 0u || data_len > BUFFER_SIZE)
+    {
+        return 0;
+    }
+
+    UartBuffer_t txData = {};
+    memcpy(txData.buffer, data, data_len);
+    txData.length = data_len;
+    return xQueueSend(uartTxQueue, &txData, 0) == pdPASS ? 1 : 0;
+}
+
 // 接收回调函数
 static void UART_RxCallback(void)
 {
@@ -282,7 +308,8 @@ UartDriver_t* get_uart_driver(void)
     static UartDriver_t uart_driver = {
         .init = usart_configuration, // 初始化函数
         .send = m_send, // 发送函数
-        .set_receive_callback = set_receive_callback // 设置接收回调函数
+        .set_receive_callback = set_receive_callback, // 设置接收回调函数
+        .try_send = uart_try_send // 非阻塞日志发送
     };
     return &uart_driver; // 返回UART驱动
 }

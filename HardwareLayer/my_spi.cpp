@@ -1,4 +1,4 @@
-#include "my_spi.h"
+#include "my_spi.h" // DMA 与中断符号保持 C ABI。
 
 #define MODULE_NAME "spi"
 
@@ -366,9 +366,8 @@ static int m_transmission(u8 spi, u8 datasize, const u16* send, u16* recv, u32 l
     return E_OK;
 }
 
-int DMA2_Channel1_IRQHandler(void)
+extern "C" void DMA2_Channel1_IRQHandler(void)
 {
-	    BaseType_t ret = 0;  
 	    /*通道1 spi3 接收完成中断*/
     if(RESET != dma_interrupt_flag_get(DMA2_FDT1_FLAG))
     {
@@ -380,13 +379,10 @@ int DMA2_Channel1_IRQHandler(void)
     {
         dma_flag_clear(DMA2_GL1_FLAG);
     }		
-	    return E_OK;
-	
 }
 
-int DMA2_Channel2_IRQHandler(void)
+extern "C" void DMA2_Channel2_IRQHandler(void)
 {
-    BaseType_t ret = 0;   
  
     /*通道2 spi3 发送完成中断*/
     if(RESET != dma_interrupt_flag_get(DMA2_FDT2_FLAG))
@@ -399,7 +395,5 @@ int DMA2_Channel2_IRQHandler(void)
     {
         dma_flag_clear(DMA2_GL2_FLAG);
     }    
-    return E_OK;
-
 }
 

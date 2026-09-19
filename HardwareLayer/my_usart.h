@@ -11,9 +11,16 @@ typedef struct {
     void (*init)(void); // 初始化函数指针
     void (*send)(char *data, uint16_t data_len); // 发送函数指针
     void (*set_receive_callback)(void (*callback)(char *data, size_t length)); // 设置接收回调函数指针
+    int (*try_send)(const char *data, uint16_t data_len); // 日志非阻塞发送，满队列时返回 0
 } UartDriver_t;
 
 // 获取UART驱动实例
+#ifdef __cplusplus
+extern "C" {
+#endif
 UartDriver_t* get_uart_driver(void);
+#ifdef __cplusplus
+}
+#endif
 
 #endif // __MY_USART_H__

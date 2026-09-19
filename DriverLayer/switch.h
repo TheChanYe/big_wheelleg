@@ -32,7 +32,7 @@ typedef struct __SWITCH c_switch;
 
 typedef struct __SWITCH
 {
-	void*             this;
+	void*             context;
     
     /************************************************* 
     * Function: set 
@@ -53,7 +53,7 @@ typedef struct __SWITCH
     *             log_error("Swtich set failed.");
     *         }
     *************************************************/      
-	int   (*set)     (const c_switch* this,confirm_state  state); 
+	int   (*set)     (const c_switch* self,confirm_state  state); 
 
     /************************************************* 
     * Function: get 
@@ -75,7 +75,7 @@ typedef struct __SWITCH
     *             log_error("Swtich get failed.");
     *         }
     *************************************************/  
-    int   (*get)     (const c_switch* this,SWITCH_TYPE* state);
+    int   (*get)     (const c_switch* self,SWITCH_TYPE* state);
     
     /************************************************* 
     * Function: flicker 
@@ -95,8 +95,8 @@ typedef struct __SWITCH
     *             log_error("Swtich set failed.");
     *         }
     *************************************************/  
-    int   (*flicker) (const c_switch* this,u16 time);
-    int   (*flicker_count) (const c_switch* this,u16 time,u8 count);
+    int   (*flicker) (const c_switch* self,u16 time);
+    int   (*flicker_count) (const c_switch* self,u16 time,u8 count);
     
     /************************************************* 
     * Function: flicker 
@@ -116,8 +116,12 @@ typedef struct __SWITCH
     *             log_error("Swtich set failed.");
     *         }
     *************************************************/
-    int   (*power)   (const c_switch* this,u8 power);
+    int   (*power)   (const c_switch* self,u8 power);
 }c_switch;
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /************************************************* 
 * Function: switch_create 
@@ -130,15 +134,18 @@ typedef struct __SWITCH
 *         <E_ERROR>  操作失败
 * Others: 无
 * Demo  :
-*         c_switch led = {0}；
+*         c_switch led = {0};
 *
 *         led = switch_create(GPIOC,GPIO_PINS_13);
-*         if(NULL == led.this)
+*         if(NULL == led.context)
 *         {
 *             log_error("Swtich creat failed.");
 *         }
 *************************************************/
 c_switch switch_create(gpio_type* gpio,uint32_t pin);
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif

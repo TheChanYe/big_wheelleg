@@ -7,7 +7,9 @@
 #include "drv8301.h"
 #include "foc_algorithm.h"
 #include "my_flash.h"
-
+#ifdef __cplusplus
+extern "C" {
+#endif
 /*FOC程序*/
 int CascadeControl_Run(Motor_Data* motor, Motor_Mode mode, float target);
 int Motor_Init(Motor_Type motor);
@@ -22,5 +24,8 @@ int Motor_CheckEncoder(Motor_Data *motor);
 ///*获取电机速度*/
 //float GetMotorPreSpeed(void);
 
+#ifdef __cplusplus
+}
+#endif
 #endif
 

@@ -5,16 +5,16 @@
  ******************************************************************************
  */
 
-#include "drv_fault.h"
+#include "drv_fault.h" // 故障中断入口保持 C 符号名。
 #include "foc.h"
 #include "motor_timr.h"
 #include "motor_fault.h"
+#include "system_init.h"
 
 extern Motor_Data g_motor1;
 extern Motor_Data g_motor2;
 extern c_drv8301 drv8301_1;
 extern c_drv8301 drv8301_2;
-extern SemaphoreHandle_t mutex;
 
 #define MOTOR0_NFAULT_PIN           GPIO_PINS_5
 #define MOTOR1_NFAULT_PIN           GPIO_PINS_15
@@ -82,7 +82,7 @@ void DrvFault_NotifyFromISR(uint8_t motor_id)
         MotorFault_EnterFromISR(0u, &g_motor1, MOTOR0_DRV_FAULT);
         if (g_motor1.tmr != NULL)
             Shut_PWM(&g_motor1);
-        gpio_bits_write(GPIOB, GPIO_PINS_12, RESET);
+        gpio_bits_write(GPIOB, GPIO_PINS_12, FALSE);
     }
     else if (motor_id == 1u)
     {
@@ -90,7 +90,7 @@ void DrvFault_NotifyFromISR(uint8_t motor_id)
         MotorFault_EnterFromISR(1u, &g_motor2, MOTOR1_DRV_FAULT);
         if (g_motor2.tmr != NULL)
             Shut_PWM(&g_motor2);
-        gpio_bits_write(GPIOC, GPIO_PINS_13, RESET);
+        gpio_bits_write(GPIOC, GPIO_PINS_13, FALSE);
     }
 }
 
@@ -115,7 +115,7 @@ void DrvFault_Process(void)
     if (pending == 0u)
         return;
 
-    if (xSemaphoreTake(mutex, pdMS_TO_TICKS(2)) != pdTRUE)
+    if (xSemaphoreTake(System_GetMutex(), pdMS_TO_TICKS(2)) != pdTRUE)
     {
         taskENTER_CRITICAL();
         g_drv_fault_pending |= pending;
@@ -129,20 +129,24 @@ void DrvFault_Process(void)
     if ((pending & 0x02u) && drv8301_2.get_status_register != NULL)
         drv8301_2.get_status_register(&drv8301_2, &g_drv_status1[1],
                                       &g_drv_status2[1]);
-    xSemaphoreGive(mutex);
+    xSemaphoreGive(System_GetMutex());
 }
 
 uint16_t DrvFault_GetStatus1(uint8_t motor_id)
 {
     return (motor_id < 2u) ? g_drv_status1[motor_id] : 0u;
 }
-
+/**
+ * @brief 获取指定电机的驱动器状态寄存器 2 的值。
+ * @param motor_id 电机编号。
+ * @return 对应电机的状态寄存器 2 的值，如果 motor_id 无效则返回 0。
+ */
 uint16_t DrvFault_GetStatus2(uint8_t motor_id)
 {
     return (motor_id < 2u) ? g_drv_status2[motor_id] : 0u;
 }
 
-void EXINT9_5_IRQHandler(void)
+extern "C" void EXINT9_5_IRQHandler(void)
 {
     if (exint_interrupt_flag_get(EXINT_LINE_5) != RESET)
     {
@@ -151,7 +155,7 @@ void EXINT9_5_IRQHandler(void)
     }
 }
 
-void EXINT15_10_IRQHandler(void)
+extern "C" void EXINT15_10_IRQHandler(void)
 {
     if (exint_interrupt_flag_get(EXINT_LINE_15) != RESET)
     {

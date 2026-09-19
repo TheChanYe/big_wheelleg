@@ -7,7 +7,7 @@
 #define MODE_LOG_TAG          MODULE_NAME
 
 // TIM1/TIM8 初始化函数
-int FOC_TMR_Init(Motor_Type motor) {
+int MotorPwm::init(Motor_Type motor) {
 	if (motor != MOTOR_1 && motor != MOTOR_2 )
 	{
 		log_error("Motor param error.");
@@ -109,19 +109,29 @@ int FOC_TMR_Init(Motor_Type motor) {
 }
 
 /*关闭PWM输出*/
-int Shut_PWM(Motor_Data* motor)
+int MotorPwm::shut(Motor_Data& state)
 {
-	// 根据电机选择定时器
-	if (motor == NULL)
-	{
-        log_error("Param error.");
-				return E_PARAM; //参数错误
-	}
+	Motor_Data* motor = &state; // 以下寄存器操作沿用原指针形式。
 	tmr_channel_value_set(motor->tmr, TMR_SELECT_CHANNEL_1, 0);
 	tmr_channel_value_set(motor->tmr, TMR_SELECT_CHANNEL_2, 0);
 	tmr_channel_value_set(motor->tmr, TMR_SELECT_CHANNEL_3, 0);
 //  tmr_channel_value_set(motor->tmr, TMR_SELECT_CHANNEL_4, TMR_PR - 1); // 触发点
 	return E_OK;
+}
+
+// 保留 FOC 模块依赖的 C ABI，空指针检查留在边界。
+extern "C" int FOC_TMR_Init(Motor_Type motor)
+{
+    return MotorPwm::init(motor);
+}
+
+extern "C" int Shut_PWM(Motor_Data* motor)
+{
+    if (motor == NULL) {
+        log_error("Param error.");
+        return E_PARAM;
+    }
+    return MotorPwm::shut(*motor);
 }
 
 

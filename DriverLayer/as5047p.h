@@ -28,13 +28,23 @@
 
 
 typedef struct __C_AS5047P c_as5047p;
+#ifdef __cplusplus
+#define AS5047P_CONTEXT_FIELD context
+extern "C" {
+#else
+#define AS5047P_CONTEXT_FIELD this
+#endif
 typedef struct __C_AS5047P
 {
-    void* this;
-	int (*get_Data)(const c_as5047p* this,float *Data);
-	int (*get_Angle)(const c_as5047p* this,float *Angle);
-	int (*get_mech_Angle)(const c_as5047p* this,float *mech_Angle);
-	int (*get_Electrical_Angle)(const c_as5047p* this,float *Electrical_Angle);	
+    void* AS5047P_CONTEXT_FIELD;
+	int (*get_Data)(const c_as5047p* self,float *Data);
+	int (*get_Angle)(const c_as5047p* self,float *Angle);
+	int (*get_mech_Angle)(const c_as5047p* self,float *mech_Angle);
+	int (*get_Electrical_Angle)(const c_as5047p* self,float *Electrical_Angle);	
 }c_as5047p;
 c_as5047p as5047p_create(u8 spi_channal,gpio_type* cs_gpio,uint32_t cs_pin);
+#ifdef __cplusplus
+}
+#endif
+#undef AS5047P_CONTEXT_FIELD
 #endif

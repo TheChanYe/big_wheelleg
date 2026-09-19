@@ -23,9 +23,16 @@
 /*  RX poll status (cannot use E_OK=0, so use positive value)  */
 #define CAN_RX_EMPTY              1   /* FIFO 为空, 无新帧 */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*  Public interface  */
 int my_can_init(void);
 int my_can_send_std(uint16_t id, const uint8_t *data, uint8_t len);
 int my_can_receive_std(uint16_t *id, uint8_t *data, uint8_t *len);
 
+#ifdef __cplusplus
+}
+#endif
 #endif /* __MY_CAN_H__ */

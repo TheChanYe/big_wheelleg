@@ -3,9 +3,15 @@
 
 #include "main.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 /* 函数原型 */
 int flash_read(uint32_t addr, void *buffer, uint16_t size);
 int flash_write(uint32_t addr, uint16_t *data, uint16_t size);
 int flash_erasepage(uint32_t page_address);
+#ifdef __cplusplus
+}
+#endif
 #endif 
 

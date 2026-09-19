@@ -13,7 +13,7 @@
   ******************************************************************************
   */
 
-#include "my_flash.h"
+#include "my_flash.h" // Flash 操作接口维持 C ABI。
 #define MODULE_NAME       "my_flash"
 
 #ifdef  MODE_LOG_TAG

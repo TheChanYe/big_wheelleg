@@ -78,63 +78,66 @@ virtualFolder:
       folders: []
     - name: System
       files:
-        - path: ../AppLayer/system/delay.c
         - path: ../AppLayer/system/delay.h
         - path: ../AppLayer/system/sys_cfg.h
-
-        - path: ../AppLayer/system/system_init.c
         - path: ../AppLayer/system/system_init.h
-        - path: ../AppLayer/system/app_tasks.c
         - path: ../AppLayer/system/app_tasks.h
         - path: ../AppLayer/system/task_config.h
-        - path: ../AppLayer/system/system_monitor.c
         - path: ../AppLayer/system/system_monitor.h
+        - path: ../AppLayer/system/system_init.cpp
+        - path: ../AppLayer/system/app_tasks.cpp
+        - path: ../AppLayer/system/system_monitor.cpp
+        - path: ../AppLayer/system/delay.cpp
       folders: []
     - name: Tools
       files:
-        - path: ../Tools/log.c
         - path: ../Tools/log.h
+        - path: ../Tools/log.cpp
       folders: []
     - name: HardwarelLayer
       files:
         - path: ../HardwareLayer/foc_cfg.h
         - path: ../HardwareLayer/motor_adc.h
-        - path: ../HardwareLayer/motor_adc.c
+        - path: ../HardwareLayer/motor_adc.cpp
         - path: ../HardwareLayer/motor_timr.h
-        - path: ../HardwareLayer/motor_timr.c
-        - path: ../HardwareLayer/my_spi.c
+        - path: ../HardwareLayer/motor_timr.cpp
         - path: ../HardwareLayer/my_spi.h
-        - path: ../HardwareLayer/my_usart.c
         - path: ../HardwareLayer/my_usart.h
-        - path: ../HardwareLayer/my_flash.c
         - path: ../HardwareLayer/my_flash.h
-        - path: ../HardwareLayer/my_can.c
-        - path: ../HardwareLayer/drv_fault.c
         - path: ../HardwareLayer/drv_fault.h
+        - path: ../HardwareLayer/drv_fault.cpp
+        - path: ../HardwareLayer/my_can.cpp
+        - path: ../HardwareLayer/my_flash.cpp
+        - path: ../HardwareLayer/my_spi.cpp
+        - path: ../HardwareLayer/my_usart.cpp
+        - path: ../HardwareLayer/i2c2_bus.cpp
+        - path: ../HardwareLayer/i2c2_bus.h
+        - path: ../HardwareLayer/i2c1_bus.cpp
+        - path: ../HardwareLayer/i2c1_bus.h
       folders: []
     - name: DriverLayer
       files:
-        - path: ../DriverLayer/switch.c
         - path: ../DriverLayer/switch.h
         - path: ../DriverLayer/lcd.c
         - path: ../DriverLayer/lcd.h
         - path: ../DriverLayer/lcd_font.h
-        - path: ../DriverLayer/as5047p.c
         - path: ../DriverLayer/as5047p.h
-        - path: ../DriverLayer/drv8301.c
         - path: ../DriverLayer/drv8301.h
-        - path: ../DriverLayer/foc.c
+        - path: ../DriverLayer/foc.cpp
         - path: ../DriverLayer/foc.h
+        - path: ../DriverLayer/as5047p.cpp
+        - path: ../DriverLayer/drv8301.cpp
+        - path: ../DriverLayer/switch.cpp
       folders: []
     - name: AlgorithmLayer
       files:
-        - path: ../AlgorithmLayer/pid.c
+        - path: ../AlgorithmLayer/pid.cpp
         - path: ../AlgorithmLayer/pid.h
-        - path: ../AlgorithmLayer/ramp_generator.c
+        - path: ../AlgorithmLayer/ramp_generator.cpp
         - path: ../AlgorithmLayer/ramp_generator.h
-        - path: ../AlgorithmLayer/lowpass_filter.c
+        - path: ../AlgorithmLayer/lowpass_filter.cpp
         - path: ../AlgorithmLayer/lowpass_filter.h
-        - path: ../AlgorithmLayer/foc_algorithm.c
+        - path: ../AlgorithmLayer/foc_algorithm.cpp
         - path: ../AlgorithmLayer/foc_algorithm.h
       folders: []
     - name: AppLayer
@@ -142,22 +145,22 @@ virtualFolder:
       folders:
         - name: motor_control
           files:
-            - path: ../AppLayer/motor_control/motor_service.c
             - path: ../AppLayer/motor_control/motor_service.h
+            - path: ../AppLayer/motor_control/motor_service.cpp
           folders: []
     - name: Safety
       files:
-        - path: ../Safety/motor_fault.c
         - path: ../Safety/motor_fault.h
-        - path: ../Safety/safety_limit.c
         - path: ../Safety/safety_limit.h
+        - path: ../Safety/safety_limit.cpp
+        - path: ../Safety/motor_fault.cpp
       folders: []
     - name: Communication
       files:
-        - path: ../Communication/can_business.c
         - path: ../Communication/can_business.h
-        - path: ../Communication/uart_business.c
+        - path: ../Communication/uart_business.cpp
         - path: ../Communication/uart_business.h
+        - path: ../Communication/can_business.cpp
       folders: []
 dependenceList: []
 outDir: build

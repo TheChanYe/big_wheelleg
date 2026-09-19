@@ -14,7 +14,7 @@
 *       V1.2  2022/04/08
 *       新增：SWITHC_POWER_INTERVAL 开关频率控制宏
 *****************************************************************************/
-#include "switch.h"
+#include "switch.h" // 保留原有函数指针对象接口，后续再收拢生命周期。
 #define MODULE_NAME       "switch"
 
 #ifdef  MODE_LOG_TAG
@@ -38,40 +38,40 @@ typedef struct __M_SWITCH
     u8            m_count    ;
 }m_switch;
 
-static int   set     (const c_switch* this,confirm_state  state);  
-static int   get     (const c_switch* this,SWITCH_TYPE* state);
-static int   flicker (const c_switch* this,u16 time);
-static int   flicker_count(const c_switch* this,u16 time,u8 count);
-static int   m_power (const c_switch* this,u8 power);
+static int   set     (const c_switch* self,confirm_state  state);  
+static int   get     (const c_switch* self,SWITCH_TYPE* state);
+static int   flicker (const c_switch* self,u16 time);
+static int   flicker_count(const c_switch* self,u16 time,u8 count);
+static int   m_power (const c_switch* self,u8 power);
 static void  timer_call_back( TimerHandle_t xTimer );
 
 c_switch switch_create(gpio_type* gpio,uint32_t pin)
 {
-	c_switch new = {0};
+	c_switch instance = {0};
 	gpio_init_type gpio_init_struct;
     TimerHandle_t  timer = NULL;
 	/*为新对象申请内存*/
-	new.this = pvPortMalloc(sizeof(m_switch));
-	if(NULL == new.this)
+	instance.context = pvPortMalloc(sizeof(m_switch));
+	if(NULL == instance.context)
 	{
 		log_error("Out of memory");
-		return new;
+		return instance;
 	}
-    memset(new.this,0,sizeof(m_switch));
+    memset(instance.context,0,sizeof(m_switch));
 
     /*创建软件定时器*/
     timer = xTimerCreate("switch timer",      /*定时器名称*/
                          1000          ,      /*默认一秒*/
                          pdTRUE        ,      /*循环定时器 */
-                         new.this      ,      /*把私有成员传到定时器回调里头*/
+                         instance.context      ,      /*把私有成员传到定时器回调里头*/
                          timer_call_back);
     /*创建情况*/
     if(NULL == timer)
     {
-        vPortFree(new.this);
-        new.this = NULL;
+        vPortFree(instance.context);
+        instance.context = NULL;
         log_error("Timer creat failed.");
-        return new;
+        return instance;
     }
     //初始化对应的GPIO
     gpio_default_para_init(&gpio_init_struct);
@@ -84,25 +84,25 @@ c_switch switch_create(gpio_type* gpio,uint32_t pin)
     gpio_init(gpio, &gpio_init_struct);
     	
 	/*保存相关变量*/
-	((m_switch* )new.this)->m_gpio     = gpio    ;
-	((m_switch* )new.this)->m_pin      = pin     ;
-	((m_switch* )new.this)->m_timer    = timer   ;
-	new.set = set;
-	new.get = get;
-	new.flicker = flicker;
-	new.power = m_power;
-    new.flicker_count = flicker_count;
+	((m_switch* )instance.context)->m_gpio     = gpio    ;
+	((m_switch* )instance.context)->m_pin      = pin     ;
+	((m_switch* )instance.context)->m_timer    = timer   ;
+	instance.set = set;
+	instance.get = get;
+	instance.flicker = flicker;
+	instance.power = m_power;
+    instance.flicker_count = flicker_count;
     
-	return new;
+	return instance;
 }
 
-static int   set     (const c_switch* this,confirm_state  state)
+static int   set     (const c_switch* self,confirm_state  state)
 {
     m_switch* m_this = NULL;
     BaseType_t      ret_os = 0;
 
     /*参数检测*/
-    if(NULL == this || NULL == this->this)
+    if(NULL == self || NULL == self->context)
     {
         log_error("Null pointer.");
         return E_NULL;
@@ -112,7 +112,7 @@ static int   set     (const c_switch* this,confirm_state  state)
         log_error("Param error");
         return E_PARAM;
     }
-    m_this = this->this;
+    m_this = static_cast<m_switch*>(self->context);
 
     /*把定时器停掉*/
     if( xTimerIsTimerActive(m_this->m_timer) != pdFALSE )
@@ -131,18 +131,18 @@ static int   set     (const c_switch* this,confirm_state  state)
     return  E_OK;
 }
 
-static int   get     (const c_switch* this,SWITCH_TYPE* state)
+static int   get     (const c_switch* self,SWITCH_TYPE* state)
 {
     const m_switch* m_this = NULL;
     SWITCH_TYPE   io_state = RESET;
 
     /*参数检测*/
-    if(NULL == this || NULL == this->this || NULL == state)
+    if(NULL == self || NULL == self->context || NULL == state)
     {
         log_error("Null pointer.");
         return E_NULL;
     }
-    m_this = this->this;
+    m_this = static_cast<const m_switch*>(self->context);
 
     io_state = gpio_input_data_bit_read(m_this->m_gpio,m_this->m_pin);
 
@@ -151,18 +151,18 @@ static int   get     (const c_switch* this,SWITCH_TYPE* state)
     return  E_OK;
 }
 
-static int   flicker (const c_switch* this,u16 time)
+static int   flicker (const c_switch* self,u16 time)
 {
     m_switch* m_this = NULL;
     BaseType_t      ret_os = 0;
 
     /*参数检测*/
-    if(NULL == this || NULL == this->this)
+    if(NULL == self || NULL == self->context)
     {
         log_error("Null pointer.");
         return E_NULL;
     }
-    m_this = this->this;
+    m_this = static_cast<m_switch*>(self->context);
     m_this->m_mode = MODE_TIMER;  /*定时模式*/
     
     /*设置新的定时器周期*/
@@ -192,18 +192,18 @@ static int   flicker (const c_switch* this,u16 time)
     return E_OK;
 }
 
-static int   flicker_count(const c_switch* this,u16 time,u8 count)
+static int   flicker_count(const c_switch* self,u16 time,u8 count)
 {
     m_switch* m_this = NULL;
     BaseType_t      ret_os = 0;
 
     /*参数检测*/
-    if(NULL == this || NULL == this->this)
+    if(NULL == self || NULL == self->context)
     {
         log_error("Null pointer.");
         return E_NULL;
     }
-    m_this = this->this;
+    m_this = static_cast<m_switch*>(self->context);
 
     if(0 == count || 0 == time)
     {
@@ -238,18 +238,18 @@ static int   flicker_count(const c_switch* this,u16 time,u8 count)
 }
 
 
-int  m_power(const c_switch* this,u8 power)
+int  m_power(const c_switch* self,u8 power)
 {
     m_switch* m_this = NULL;
     BaseType_t      ret_os = 0;
 
     /*参数检测*/
-    if(NULL == this || NULL == this->this)
+    if(NULL == self || NULL == self->context)
     {
         log_error("Null pointer.");
         return E_NULL;
     }
-		m_this = this->this;
+		m_this = static_cast<m_switch*>(self->context);
     if(power >= 10)
     {
         log_error("Param error.");
@@ -289,7 +289,7 @@ static void  timer_call_back( TimerHandle_t xTimer )
     BaseType_t      ret_os = 0;
 
     /*获取定时器ID*/
-    m_this = pvTimerGetTimerID(xTimer);
+    m_this = static_cast<m_switch*>(pvTimerGetTimerID(xTimer));
     if(NULL == m_this)
     {
         log_error("Timer id get failed.");

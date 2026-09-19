@@ -7,7 +7,7 @@
  ******************************************************************************
  */
 
-#include "my_can.h"
+#include "my_can.h" // CAN 寄存器驱动仍使用厂商 C API。
 
 #define MODULE_NAME     "my_can"
 

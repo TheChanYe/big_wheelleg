@@ -1,4 +1,4 @@
-#include "delay.h"
+#include "delay.h" // C++ 编译，原有 C 接口保持不变。
 
 /* delay macros */
 #define STEP_DELAY_MS                    50

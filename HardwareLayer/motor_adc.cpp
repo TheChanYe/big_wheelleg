@@ -59,7 +59,7 @@ float queryTemp(float r)
 
 
 // ADC 初始化函数
-int FOC_ADC_Init(Motor_Type motor) {
+int MotorAdc::init(Motor_Type motor) {
 	if (motor != MOTOR_1 && motor != MOTOR_2 )
 	{
 		log_error("Motor param error.");
@@ -158,7 +158,7 @@ int FOC_ADC_Init(Motor_Type motor) {
 		return E_OK;
 }
 
-int Motor_ADC_UpdateBusVoltage(void)
+int MotorAdc::updateBusVoltage()
 {
     uint32_t wait_count;
     uint16_t raw;
@@ -181,18 +181,18 @@ int Motor_ADC_UpdateBusVoltage(void)
     return E_ERROR;
 }
 
-float Motor_ADC_GetBusVoltage(void)
+float MotorAdc::busVoltage()
 {
     return g_bus_voltage;
 }
 
-uint8_t Motor_ADC_BusVoltageValid(void)
+uint8_t MotorAdc::busVoltageValid()
 {
     return g_bus_voltage_valid;
 }
 
 /*ADC1电流采样中断处理程序*/
-void ADC1_2_IRQHandler(void)
+extern "C" void ADC1_2_IRQHandler(void)
 {
   if( adc_interrupt_flag_get(ADC1, ADC_PCCE_FLAG) != RESET)
   {
@@ -241,7 +241,7 @@ void ADC1_2_IRQHandler(void)
 			
 			BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 			//向目标任务发送任务通知，已唤醒任务
-			vTaskNotifyGiveFromISR(g_motor0_task_handle, &xHigherPriorityTaskWoken);
+			vTaskNotifyGiveFromISR(AppTasks_GetMotorTaskHandle(0u),&xHigherPriorityTaskWoken);
 			// 如果有更高优先级的任务被唤醒，执行上下文切换
 			portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 #endif
@@ -250,7 +250,7 @@ void ADC1_2_IRQHandler(void)
 	}
 }
 /*ADC3电流采样中断处理程序*/
-void ADC3_IRQHandler(void)
+extern "C" void ADC3_IRQHandler(void)
 {
   if( adc_interrupt_flag_get(ADC3, ADC_PCCE_FLAG) != RESET)
   {
@@ -298,12 +298,33 @@ void ADC3_IRQHandler(void)
 #else
 			BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 			//向目标任务发送任务通知，已唤醒任务
-			vTaskNotifyGiveFromISR(g_motor1_task_handle, &xHigherPriorityTaskWoken);//
+			vTaskNotifyGiveFromISR(AppTasks_GetMotorTaskHandle(1u), &xHigherPriorityTaskWoken);//
 			// 如果有更高优先级的任务被唤醒，执行上下文切换
 			portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 #endif
 		}
 		adc_flag_clear(ADC3, ADC_PCCE_FLAG);//清除抢占转换通道转换结束标志位
 	}
+}
+
+// 保持 C 调用方所用符号名称；所有硬件状态仍在原全局数据中。
+extern "C" int FOC_ADC_Init(Motor_Type motor)
+{
+    return MotorAdc::init(motor);
+}
+
+extern "C" int Motor_ADC_UpdateBusVoltage(void)
+{
+    return MotorAdc::updateBusVoltage();
+}
+
+extern "C" float Motor_ADC_GetBusVoltage(void)
+{
+    return MotorAdc::busVoltage();
+}
+
+extern "C" uint8_t Motor_ADC_BusVoltageValid(void)
+{
+    return MotorAdc::busVoltageValid();
 }
 

@@ -71,9 +71,9 @@ c_lcd lcd_create(u8 spi_channal, gpio_type* re_gpio, uint32_t re_pin,
     }
 
     // 配置引脚
-    if ((m_this->m_re = switch_create(re_gpio, re_pin)).this == NULL ||
-        (m_this->m_dc = switch_create(dc_gpio, dc_pin)).this == NULL ||
-        (m_this->m_cs = switch_create(cs_gpio, cs_pin)).this == NULL) {
+    if ((m_this->m_re = switch_create(re_gpio, re_pin)).context == NULL ||
+        (m_this->m_dc = switch_create(dc_gpio, dc_pin)).context == NULL ||
+        (m_this->m_cs = switch_create(cs_gpio, cs_pin)).context == NULL) {
         log_error("Switch create failed.");
         goto error_handle;
     }

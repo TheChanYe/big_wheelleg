@@ -27,7 +27,13 @@ typedef struct __C_SPI
 		int (*transmission)(u8 spi,u8 datasize,const u16* send,u16* recv,u32 len,bool incremental,TickType_t time);
 }c_spi;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 extern const c_spi my_spi;
+#ifdef __cplusplus
+}
+#endif
 #endif
 
 

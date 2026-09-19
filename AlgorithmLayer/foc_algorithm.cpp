@@ -13,30 +13,30 @@ Clark变换
 输入参数：三相电流 Ia Ib Ialpha Ibeta
 将输入的三相互差120度电流转换为两相互差90度电流
 ***************************************/
-void Clark_Transf(float Ia,float Ib,float Ic,float *Ialpha,float *Ibeta)
+void FocAlgorithm::clarke(float Ia,float Ib,float Ic,float& Ialpha,float& Ibeta)
 {
-	*Ialpha = Ia;
-	*Ibeta = (Ia + 2*Ib ) / SQRT3; // (Ib * (sqrt3 / 2.0f) - Ic * (sqrt3 / 2.0f)) * 2.0f / 3.0f;
+	Ialpha = Ia;
+	Ibeta = (Ia + 2*Ib ) / SQRT3; // (Ib * (sqrt3 / 2.0f) - Ic * (sqrt3 / 2.0f)) * 2.0f / 3.0f;
 }
 /***************************************
 功能：PARK变换
 形参：alpha_beta电流、theta值、DQ轴电流
 说明：交流变直流
 ***************************************/
-void Park_Transf(float Ialpha,float Ibeta,float theta,float *Id,float *Iq)
+void FocAlgorithm::park(float Ialpha,float Ibeta,float theta,float& Id,float& Iq)
 {
-	*Id = Ialpha * arm_cos_f32(theta) + Ibeta * arm_sin_f32(theta);
-	*Iq =	Ibeta * arm_cos_f32(theta)  - Ialpha * arm_sin_f32(theta);
+	Id = Ialpha * arm_cos_f32(theta) + Ibeta * arm_sin_f32(theta);
+	Iq =	Ibeta * arm_cos_f32(theta)  - Ialpha * arm_sin_f32(theta);
 }
 /***************************************
 功能：反PARK变换
 形参：DQ轴电压、theta值、alpha_beta电压
 说明：直流变交流
 ***************************************/
-void RevParkOperate(float vd,float vq,float theta,float *valpha,float *vbeta)
+void FocAlgorithm::inversePark(float vd,float vq,float theta,float& valpha,float& vbeta)
 {
-	*valpha=vd*arm_cos_f32(theta)-vq*arm_sin_f32(theta);
-	*vbeta=vd*arm_sin_f32(theta)+vq*arm_cos_f32(theta);
+	valpha=vd*arm_cos_f32(theta)-vq*arm_sin_f32(theta);
+	vbeta=vd*arm_sin_f32(theta)+vq*arm_cos_f32(theta);
 }
 
 // 计算电流采样时间点的函数
@@ -72,8 +72,9 @@ static uint16_t CalculateSamplingTime(Motor_Data *motor,uint16_t ccr_ref, uint16
 说明：根据alpha_beta电压计算三相占空比
 ***************************************/
 // SVPWM计算函数
-void SvpwmAlgorithm(Motor_Data *motor, float valpha, float vbeta, float udc, uint32_t tpwm) 
+void FocAlgorithm::svpwm(Motor_Data& state, float valpha, float vbeta, float udc, uint32_t tpwm)
 {
+    Motor_Data* motor = &state; // 下方定时器操作沿用原指针访问形式。
     float ta = 0.0f;  // 矢量作用时间A
     float tb = 0.0f;  // 矢量作用时间B
     float value1 = 0.0f, value2 = 0.0f, value3 = 0.0f;  // 三相占空比
@@ -147,7 +148,7 @@ void SvpwmAlgorithm(Motor_Data *motor, float valpha, float vbeta, float udc, uin
     value3 = value2 + tb / 2.0f;       // 第三相占空比
 
     /******************** 计算CCR值及电流采样时间点 ********************/
-    uint16_t ccr1, ccr2, ccr3, ccr4;
+    uint16_t ccr1 = 0, ccr2 = 0, ccr3 = 0, ccr4 = 0;
     switch (sector) {
         case 3: ccr1 = value1; ccr2 = value2; ccr3 = value3; ccr4 = CalculateSamplingTime(motor,ccr2, ccr3); break;
         case 1: ccr1 = value2; ccr2 = value1; ccr3 = value3; ccr4 = CalculateSamplingTime(motor,ccr1, ccr2); break;
@@ -174,4 +175,26 @@ void SvpwmAlgorithm(Motor_Data *motor, float valpha, float vbeta, float udc, uin
 
     // 调试信息（可选）
     // log_inform("%d %d %d %d", ccr1, ccr2, ccr3, ccr4);
+}
+
+// 保留原 C ABI，供尚未迁移的 foc.c 和其他 C 模块调用。
+extern "C" void Clark_Transf(float Ia, float Ib, float Ic, float* Ialpha, float* Ibeta)
+{
+    FocAlgorithm::clarke(Ia, Ib, Ic, *Ialpha, *Ibeta);
+}
+
+extern "C" void Park_Transf(float Ialpha, float Ibeta, float theta, float* Id, float* Iq)
+{
+    FocAlgorithm::park(Ialpha, Ibeta, theta, *Id, *Iq);
+}
+
+extern "C" void RevParkOperate(float vd, float vq, float theta, float* valpha, float* vbeta)
+{
+    FocAlgorithm::inversePark(vd, vq, theta, *valpha, *vbeta);
+}
+
+extern "C" void SvpwmAlgorithm(Motor_Data* motor, float valpha, float vbeta,
+                                float udc, uint32_t tpwm)
+{
+    FocAlgorithm::svpwm(*motor, valpha, vbeta, udc, tpwm);
 }
