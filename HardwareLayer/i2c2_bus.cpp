@@ -28,6 +28,31 @@ int I2c2Bus::init()
     return E_OK;
 }
 
+int I2c2Bus::readRegisters(uint8_t address7, uint8_t start_reg, 
+                           uint8_t *data, uint16_t length) {
+    if (!initialized_ || address7 > 0x7Fu 
+        || data == nullptr || length == 0u) {
+        return E_PARAM;
+    }
+
+    /*
+     * 临时诊断实现：逐个使用已经验证通过的单字节读取事务。
+     * 若这样能获得正常数据，即可确认问题只位于 AT32 多字节接收时序。
+     * 注意：这种方式不能保证 14 个字节来自同一个采样时刻。
+     */
+    for (uint16_t index = 0u; index < length; ++index) {
+        const uint8_t reg = static_cast<uint8_t>(start_reg + index);
+        const int result = readRegister(address7, reg, data[index]);
+
+        if (result != E_OK) {
+            return result;
+        }
+    }
+    return E_OK;
+}
+
+
+
 bool I2c2Bus::waitFlag(uint32_t flag, bool expectedSet) const
 {
     for (uint32_t count = 0; count < kWaitLimit; ++count) {
@@ -73,7 +98,8 @@ void I2c2Bus::abortTransfer() const
                    I2C_ARLOST_FLAG |
                    I2C_TMOUT_FLAG);
 
-    // 单字节读取会暂时关闭 ACK；无论哪里出错都恢复它。
+    // 接收会暂时改变 ACK 行为；无论哪里出错都恢复默认状态。
+    i2c_master_receive_ack_set(I2C2, I2C_MASTER_ACK_CURRENT);
     i2c_ack_enable(I2C2, TRUE);
 }
 

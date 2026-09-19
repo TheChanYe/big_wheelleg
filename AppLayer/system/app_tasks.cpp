@@ -256,8 +256,9 @@ void TaskManager::uartBusinessTask(void *argument)
 
     while (true)
     {
-        uart_business_process(); // 处理 UART 业务
-        vTaskDelay(pdMS_TO_TICKS(1)); // 延时 1 毫秒
+        /* MPU6050 调试阶段暂时关闭原来的高速浮点遥测，避免刷屏。 */
+        // uart_business_process();
+        vTaskDelay(pdMS_TO_TICKS(500)); // 延时 500 毫秒
     }
 }
 
@@ -454,4 +455,3 @@ extern "C" TaskHandle_t AppTasks_GetMotorTaskHandle(
 
     return g_task_manager->motorTaskHandle(motor_id);
 }
-

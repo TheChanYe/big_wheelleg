@@ -112,8 +112,6 @@ virtualFolder:
         - path: ../HardwareLayer/my_usart.cpp
         - path: ../HardwareLayer/i2c2_bus.cpp
         - path: ../HardwareLayer/i2c2_bus.h
-        - path: ../HardwareLayer/i2c1_bus.cpp
-        - path: ../HardwareLayer/i2c1_bus.h
       folders: []
     - name: DriverLayer
       files:
@@ -128,6 +126,8 @@ virtualFolder:
         - path: ../DriverLayer/as5047p.cpp
         - path: ../DriverLayer/drv8301.cpp
         - path: ../DriverLayer/switch.cpp
+        - path: ../DriverLayer/mpu6050.h
+        - path: ../DriverLayer/mpu6050.cpp
       folders: []
     - name: AlgorithmLayer
       files:

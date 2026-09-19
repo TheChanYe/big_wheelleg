@@ -29,6 +29,22 @@ class I2c2Bus final {
     /** 从设备的一个寄存器读取一个字节，成功时写入 value */
     int readRegister(uint8_t address7, uint8_t reg, uint8_t& value);
 
+    /**
+     * @brief 从连续寄存器中读取多个字节。
+     *
+     * @param address7 7 位 I²C 地址，例如 MPU6050 为 0x68。
+     * @param start_reg 第一个寄存器地址。
+     * @param data      接收缓冲区。
+     * @param length    要读取的字节数。
+     *
+     * @return E_OK 表示成功，其他值表示失败。
+     */
+    int readRegisters(uint8_t address7,
+                      uint8_t start_reg,
+                      uint8_t *data,
+                      uint16_t length);
+                      
+    
   private:
     static constexpr uint32_t kWaitLimit = 200000u;
 
